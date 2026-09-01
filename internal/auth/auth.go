@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/database"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/database"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 )
 
 type Role string

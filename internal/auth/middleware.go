@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 )
 
 type contextKey string

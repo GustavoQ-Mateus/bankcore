@@ -1,4 +1,4 @@
-module github.com/Gustavo-QMateus/bankcore
+module github.com/GustavoQ-Mateus/bankcore
 
 go 1.27.0
 

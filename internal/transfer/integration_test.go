@@ -14,8 +14,8 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
-	"github.com/Gustavo-QMateus/bankcore/internal/transfer"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
 )
 
 func setupPool(t *testing.T) *pgxpool.Pool {

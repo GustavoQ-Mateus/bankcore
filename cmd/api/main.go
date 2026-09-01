@@ -14,12 +14,12 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/account"
-	"github.com/Gustavo-QMateus/bankcore/internal/auth"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/config"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/database"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
-	"github.com/Gustavo-QMateus/bankcore/internal/transfer"
+	"github.com/GustavoQ-Mateus/bankcore/internal/account"
+	"github.com/GustavoQ-Mateus/bankcore/internal/auth"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/config"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/database"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
 )
 
 func main() {

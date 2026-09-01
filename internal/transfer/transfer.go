@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/ledger"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/database"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/ledger"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/database"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 )
 
 const maxRetries = 3

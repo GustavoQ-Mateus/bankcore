@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 )
 
 type Handler struct {

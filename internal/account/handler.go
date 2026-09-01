@@ -7,9 +7,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/auth"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/httpx"
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/money"
+	"github.com/GustavoQ-Mateus/bankcore/internal/auth"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/money"
 )
 
 const pageSize = 20

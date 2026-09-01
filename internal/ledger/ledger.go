@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/Gustavo-QMateus/bankcore/internal/platform/database"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/database"
 )
 
 type EntryType string
