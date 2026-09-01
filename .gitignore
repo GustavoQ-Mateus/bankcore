@@ -1,0 +1,12 @@
+# Go
+/bin/
+*.exe
+*.out
+*.test
+/tmp/
+# Env / secrets
+.env
+*.local
+# Editor
+.vscode/
+.idea/
