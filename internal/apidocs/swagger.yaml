@@ -1,0 +1,496 @@
+basePath: /
+definitions:
+  internal_account.Account:
+    properties:
+      balance_cents:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: string
+      number:
+        type: string
+      owner_id:
+        type: string
+      status:
+        $ref: '#/definitions/internal_account.Status'
+      version:
+        type: integer
+    type: object
+  internal_account.Status:
+    enum:
+    - ACTIVE
+    - BLOCKED
+    type: string
+    x-enum-varnames:
+    - StatusActive
+    - StatusBlocked
+  internal_account.amountRequest:
+    properties:
+      amount:
+        type: string
+    type: object
+  internal_account.statusRequest:
+    properties:
+      status:
+        $ref: '#/definitions/internal_account.Status'
+    type: object
+  internal_auth.Customer:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        $ref: '#/definitions/internal_auth.Role'
+    type: object
+  internal_auth.Role:
+    enum:
+    - CUSTOMER
+    - ADMIN
+    type: string
+    x-enum-varnames:
+    - RoleCustomer
+    - RoleAdmin
+  internal_auth.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_auth.registerRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      role:
+        $ref: '#/definitions/internal_auth.Role'
+    type: object
+  internal_transfer.Status:
+    enum:
+    - PENDING
+    - SETTLED
+    - FAILED
+    type: string
+    x-enum-varnames:
+    - StatusPending
+    - StatusSettled
+    - StatusFailed
+  internal_transfer.Transfer:
+    properties:
+      amount_cents:
+        type: integer
+      created_at:
+        type: string
+      from_account_id:
+        type: string
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/internal_transfer.Status'
+      to_account_id:
+        type: string
+    type: object
+  internal_transfer.transferRequest:
+    properties:
+      amount:
+        type: string
+      from:
+        type: string
+      to:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: 'Núcleo bancário em Go: contas, depósitos, saques e transferências
+    atômicas com ledger append-only. Valores entram/saem em decimal e são operados
+    em centavos int64.'
+  title: BankCore API
+  version: 1.0.0
+paths:
+  /accounts:
+    post:
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_account.Account'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Abrir conta
+      tags:
+      - accounts
+  /accounts/{id}:
+    get:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_account.Account'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Consultar conta e saldo
+      tags:
+      - accounts
+  /accounts/{id}/deposit:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: valor decimal
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_account.amountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_account.Account'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Depósito
+      tags:
+      - accounts
+  /accounts/{id}/statement:
+    get:
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: página
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Extrato paginado
+      tags:
+      - accounts
+  /accounts/{id}/withdraw:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: valor decimal
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_account.amountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_account.Account'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Saque
+      tags:
+      - accounts
+  /admin/accounts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_account.Account'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar contas (ADMIN)
+      tags:
+      - admin
+  /admin/accounts/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: account id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: novo status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_account.statusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_account.Account'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Bloquear/desbloquear conta (ADMIN)
+      tags:
+      - admin
+  /admin/transfers:
+    get:
+      parameters:
+      - description: PENDING, SETTLED ou FAILED
+        in: query
+        name: status
+        required: true
+        type: string
+      - description: página
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar transferências por status (ADMIN)
+      tags:
+      - admin
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: credenciais
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_auth.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Login e emissão de JWT
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: dados do cliente
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_auth.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_auth.Customer'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Registrar cliente
+      tags:
+      - auth
+  /transfers:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: chave de idempotência
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: origem, destino e valor
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_transfer.transferRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_transfer.Transfer'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Transferência atômica entre contas
+      tags:
+      - transfers
+  /transfers/{id}:
+    get:
+      parameters:
+      - description: transfer id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_transfer.Transfer'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Consultar transferência
+      tags:
+      - transfers
+securityDefinitions:
+  BearerAuth:
+    description: 'Informe o token como: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

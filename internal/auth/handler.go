@@ -34,6 +34,16 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+// register godoc
+// @Summary  Registrar cliente
+// @Tags     auth
+// @Accept   json
+// @Produce  json
+// @Param    body  body      registerRequest  true  "dados do cliente"
+// @Success  201   {object}  Customer
+// @Failure  400   {object}  map[string]any
+// @Failure  409   {object}  map[string]any
+// @Router   /auth/register [post]
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := httpx.Decode(r, &req); err != nil {
@@ -56,6 +66,15 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, c)
 }
 
+// login godoc
+// @Summary  Login e emissão de JWT
+// @Tags     auth
+// @Accept   json
+// @Produce  json
+// @Param    body  body      loginRequest  true  "credenciais"
+// @Success  200   {object}  map[string]any
+// @Failure  401   {object}  map[string]any
+// @Router   /auth/login [post]
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := httpx.Decode(r, &req); err != nil {

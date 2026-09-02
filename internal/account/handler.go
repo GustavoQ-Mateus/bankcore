@@ -43,6 +43,14 @@ type statusRequest struct {
 	Status Status `json:"status"`
 }
 
+// open godoc
+// @Summary  Abrir conta
+// @Tags     accounts
+// @Produce  json
+// @Security BearerAuth
+// @Success  201  {object}  Account
+// @Failure  401  {object}  map[string]any
+// @Router   /accounts [post]
 func (h *Handler) open(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFrom(r.Context())
 	if !ok {
@@ -57,6 +65,16 @@ func (h *Handler) open(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, acc)
 }
 
+// get godoc
+// @Summary  Consultar conta e saldo
+// @Tags     accounts
+// @Produce  json
+// @Security BearerAuth
+// @Param    id   path      string  true  "account id"
+// @Success  200  {object}  Account
+// @Failure  403  {object}  map[string]any
+// @Failure  404  {object}  map[string]any
+// @Router   /accounts/{id} [get]
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	acc, err := h.authorized(r)
 	if err != nil {
@@ -66,6 +84,18 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, acc)
 }
 
+// deposit godoc
+// @Summary  Depósito
+// @Tags     accounts
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      string         true  "account id"
+// @Param    body  body      amountRequest  true  "valor decimal"
+// @Success  200   {object}  Account
+// @Failure  400   {object}  map[string]any
+// @Failure  403   {object}  map[string]any
+// @Router   /accounts/{id}/deposit [post]
 func (h *Handler) deposit(w http.ResponseWriter, r *http.Request) {
 	acc, amount, err := h.parseAmountOp(r)
 	if err != nil {
@@ -80,6 +110,18 @@ func (h *Handler) deposit(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, updated)
 }
 
+// withdraw godoc
+// @Summary  Saque
+// @Tags     accounts
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      string         true  "account id"
+// @Param    body  body      amountRequest  true  "valor decimal"
+// @Success  200   {object}  Account
+// @Failure  400   {object}  map[string]any
+// @Failure  403   {object}  map[string]any
+// @Router   /accounts/{id}/withdraw [post]
 func (h *Handler) withdraw(w http.ResponseWriter, r *http.Request) {
 	acc, amount, err := h.parseAmountOp(r)
 	if err != nil {
@@ -94,6 +136,15 @@ func (h *Handler) withdraw(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, updated)
 }
 
+// statement godoc
+// @Summary  Extrato paginado
+// @Tags     accounts
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      string  true   "account id"
+// @Param    page  query     int     false  "página"
+// @Success  200   {object}  map[string]any
+// @Router   /accounts/{id}/statement [get]
 func (h *Handler) statement(w http.ResponseWriter, r *http.Request) {
 	acc, err := h.authorized(r)
 	if err != nil {
@@ -117,6 +168,14 @@ func (h *Handler) statement(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// adminList godoc
+// @Summary  Listar contas (ADMIN)
+// @Tags     admin
+// @Produce  json
+// @Security BearerAuth
+// @Success  200  {array}   Account
+// @Failure  403  {object}  map[string]any
+// @Router   /admin/accounts [get]
 func (h *Handler) adminList(w http.ResponseWriter, r *http.Request) {
 	accounts, err := h.svc.List(r.Context())
 	if err != nil {
@@ -126,6 +185,18 @@ func (h *Handler) adminList(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, accounts)
 }
 
+// adminSetStatus godoc
+// @Summary  Bloquear/desbloquear conta (ADMIN)
+// @Tags     admin
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      string         true  "account id"
+// @Param    body  body      statusRequest  true  "novo status"
+// @Success  200   {object}  Account
+// @Failure  403   {object}  map[string]any
+// @Failure  404   {object}  map[string]any
+// @Router   /admin/accounts/{id}/status [patch]
 func (h *Handler) adminSetStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

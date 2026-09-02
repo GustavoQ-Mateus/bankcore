@@ -226,6 +226,48 @@ func (s *Service) markFailed(ctx context.Context, id uuid.UUID) {
 	_, _ = s.pool.Exec(ctx, `UPDATE transfers SET status = 'FAILED' WHERE id = $1`, id)
 }
 
+func (s *Service) Get(ctx context.Context, id uuid.UUID) (Transfer, error) {
+	var t Transfer
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, from_account_id, to_account_id, amount_cents, status, created_at
+		 FROM transfers WHERE id = $1`, id,
+	).Scan(&t.ID, &t.FromAccountID, &t.ToAccountID, &t.AmountCents, &t.Status, &t.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Transfer{}, httpx.ErrNotFound
+		}
+		return Transfer{}, httpx.ErrInternal
+	}
+	return t, nil
+}
+
+func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset int) ([]Transfer, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, from_account_id, to_account_id, amount_cents, status, created_at
+		 FROM transfers WHERE status = $1
+		 ORDER BY created_at ASC
+		 LIMIT $2 OFFSET $3`,
+		status, limit, offset,
+	)
+	if err != nil {
+		return nil, httpx.ErrInternal
+	}
+	defer rows.Close()
+
+	transfers := make([]Transfer, 0, limit)
+	for rows.Next() {
+		var t Transfer
+		if err := rows.Scan(&t.ID, &t.FromAccountID, &t.ToAccountID, &t.AmountCents, &t.Status, &t.CreatedAt); err != nil {
+			return nil, httpx.ErrInternal
+		}
+		transfers = append(transfers, t)
+	}
+	if rows.Err() != nil {
+		return nil, httpx.ErrInternal
+	}
+	return transfers, nil
+}
+
 func (s *Service) findByKey(ctx context.Context, key string) (Transfer, error) {
 	var t Transfer
 	err := s.pool.QueryRow(ctx,

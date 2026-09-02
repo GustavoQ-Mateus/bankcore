@@ -13,8 +13,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"github.com/GustavoQ-Mateus/bankcore/internal/account"
+	_ "github.com/GustavoQ-Mateus/bankcore/internal/apidocs"
 	"github.com/GustavoQ-Mateus/bankcore/internal/auth"
 	"github.com/GustavoQ-Mateus/bankcore/internal/platform/config"
 	"github.com/GustavoQ-Mateus/bankcore/internal/platform/database"
@@ -22,6 +24,15 @@ import (
 	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
 )
 
+// @title           BankCore API
+// @version         1.0.0
+// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64.
+// @host            localhost:8080
+// @BasePath        /
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Informe o token como: Bearer {token}
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
@@ -66,6 +77,8 @@ func run() error {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
 	r.Route("/auth", authHandler.Routes)
 
 	r.Group(func(r chi.Router) {
@@ -74,7 +87,10 @@ func run() error {
 		r.Route("/transfers", transferHandler.Routes)
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireRole(auth.RoleAdmin))
-			r.Route("/admin", accountHandler.AdminRoutes)
+			r.Route("/admin", func(r chi.Router) {
+				accountHandler.AdminRoutes(r)
+				transferHandler.AdminRoutes(r)
+			})
 		})
 	})
 
