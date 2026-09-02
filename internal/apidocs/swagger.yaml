@@ -52,10 +52,12 @@ definitions:
     enum:
     - CUSTOMER
     - ADMIN
+    - SETTLEMENT
     type: string
     x-enum-varnames:
     - RoleCustomer
     - RoleAdmin
+    - RoleSettlement
   internal_auth.loginRequest:
     properties:
       email:
@@ -73,6 +75,13 @@ definitions:
         type: string
       role:
         $ref: '#/definitions/internal_auth.Role'
+    type: object
+  internal_auth.tokenRequest:
+    properties:
+      client_id:
+        type: string
+      client_secret:
+        type: string
     type: object
   internal_transfer.Status:
     enum:
@@ -94,9 +103,18 @@ definitions:
         type: string
       id:
         type: string
+      settled_at:
+        type: string
+      settlement_ref:
+        type: string
       status:
         $ref: '#/definitions/internal_transfer.Status'
       to_account_id:
+        type: string
+    type: object
+  internal_transfer.settleRequest:
+    properties:
+      settlement_ref:
         type: string
     type: object
   internal_transfer.transferRequest:
@@ -113,9 +131,10 @@ info:
   contact: {}
   description: 'Núcleo bancário em Go: contas, depósitos, saques e transferências
     atômicas com ledger append-only. Valores entram/saem em decimal e são operados
-    em centavos int64.'
+    em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR
+    0004).'
   title: BankCore API
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /accounts:
     post:
@@ -326,6 +345,28 @@ paths:
       summary: Bloquear/desbloquear conta (ADMIN)
       tags:
       - admin
+  /admin/service-clients:
+    post:
+      description: Gera client_id/client_secret para o Liquida. O client_secret é
+        exibido UMA ÚNICA VEZ.
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Provisionar credencial de serviço (ADMIN)
+      tags:
+      - admin
   /admin/transfers:
     get:
       parameters:
@@ -414,7 +455,60 @@ paths:
       summary: Registrar cliente
       tags:
       - auth
+  /auth/token:
+    post:
+      consumes:
+      - application/json
+      description: 'Fluxo M2M do Liquida: troca client_id/client_secret por um JWT
+        role=SETTLEMENT com TTL curto. Ver ADR 0004.'
+      parameters:
+      - description: credenciais de serviço
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_auth.tokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Token de serviço (client-credentials)
+      tags:
+      - auth
   /transfers:
+    get:
+      parameters:
+      - description: PENDING, SETTLED ou FAILED
+        in: query
+        name: status
+        required: true
+        type: string
+      - description: página
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar minhas transferências por status
+      tags:
+      - transfers
     post:
       consumes:
       - application/json
@@ -487,6 +581,83 @@ paths:
       summary: Consultar transferência
       tags:
       - transfers
+  /transfers/{id}/fail:
+    patch:
+      parameters:
+      - description: transfer id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_transfer.Transfer'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Falhar liquidação com estorno (SETTLEMENT)
+      tags:
+      - settlement
+  /transfers/{id}/settle:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: transfer id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: referência da liquidação
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/internal_transfer.settleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_transfer.Transfer'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Confirmar liquidação (SETTLEMENT)
+      tags:
+      - settlement
 securityDefinitions:
   BearerAuth:
     description: 'Informe o token como: Bearer {token}'

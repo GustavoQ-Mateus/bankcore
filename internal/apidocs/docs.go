@@ -344,6 +344,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/service-clients": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Gera client_id/client_secret para o Liquida. O client_secret é exibido UMA ÚNICA VEZ.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Provisionar credencial de serviço (ADMIN)",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/admin/transfers": {
             "get": {
                 "security": [
@@ -479,7 +512,87 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/token": {
+            "post": {
+                "description": "Fluxo M2M do Liquida: troca client_id/client_secret por um JWT role=SETTLEMENT com TTL curto. Ver ADR 0004.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Token de serviço (client-credentials)",
+                "parameters": [
+                    {
+                        "description": "credenciais de serviço",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_auth.tokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/transfers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transfers"
+                ],
+                "summary": "Listar minhas transferências por status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "PENDING, SETTLED ou FAILED",
+                        "name": "status",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "página",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -591,6 +704,125 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/transfers/{id}/fail": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settlement"
+                ],
+                "summary": "Falhar liquidação com estorno (SETTLEMENT)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "transfer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transfer.Transfer"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/transfers/{id}/settle": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settlement"
+                ],
+                "summary": "Confirmar liquidação (SETTLEMENT)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "transfer id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "referência da liquidação",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transfer.settleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_transfer.Transfer"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -671,11 +903,13 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "CUSTOMER",
-                "ADMIN"
+                "ADMIN",
+                "SETTLEMENT"
             ],
             "x-enum-varnames": [
                 "RoleCustomer",
-                "RoleAdmin"
+                "RoleAdmin",
+                "RoleSettlement"
             ]
         },
         "internal_auth.loginRequest": {
@@ -703,6 +937,17 @@ const docTemplate = `{
                 },
                 "role": {
                     "$ref": "#/definitions/internal_auth.Role"
+                }
+            }
+        },
+        "internal_auth.tokenRequest": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string"
+                },
+                "client_secret": {
+                    "type": "string"
                 }
             }
         },
@@ -734,10 +979,24 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "settled_at": {
+                    "type": "string"
+                },
+                "settlement_ref": {
+                    "type": "string"
+                },
                 "status": {
                     "$ref": "#/definitions/internal_transfer.Status"
                 },
                 "to_account_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_transfer.settleRequest": {
+            "type": "object",
+            "properties": {
+                "settlement_ref": {
                     "type": "string"
                 }
             }
@@ -769,12 +1028,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0.0",
+	Version:          "1.1.0",
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "BankCore API",
-	Description:      "Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64.",
+	Description:      "Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

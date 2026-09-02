@@ -70,20 +70,28 @@ Health check: `curl localhost:8080/health`.
 |---|---|---|
 | POST | `/auth/register` | pública |
 | POST | `/auth/login` | pública |
+| POST | `/auth/token` (client-credentials) | pública |
 | POST | `/accounts` | cliente |
 | GET | `/accounts/{id}` | dono/admin |
 | POST | `/accounts/{id}/deposit` | dono/admin |
 | POST | `/accounts/{id}/withdraw` | dono/admin |
 | GET | `/accounts/{id}/statement?page=` | dono/admin |
 | POST | `/transfers` (header `Idempotency-Key`) | dono/admin |
+| GET | `/transfers?status=` | dono |
 | GET | `/transfers/{id}` | participante/admin |
+| PATCH | `/transfers/{id}/settle` | settlement |
+| PATCH | `/transfers/{id}/fail` | settlement |
 | GET | `/admin/accounts` | admin |
 | PATCH | `/admin/accounts/{id}/status` | admin |
 | GET | `/admin/transfers?status=` | admin |
+| POST | `/admin/service-clients` | admin |
 | GET | `/health` | pública |
 | GET | `/swagger/index.html` | pública |
 
 Valores monetários entram/saem em decimal (`"100.50"`) e são operados internamente em centavos `int64`.
+
+### Fronteira de liquidação com o Liquida (v1.1.0)
+Com `LIQUIDA_INTEGRATION=external`, `POST /transfers` move o dinheiro atomicamente mas deixa a transferência `PENDING`; o Liquida autentica via client-credentials (`POST /auth/token` → JWT `SETTLEMENT` com TTL curto), lê pendências (`GET /transfers?status=PENDING`) e confirma com `PATCH /transfers/{id}/settle` ou estorna com `/fail`. Padrão é `standalone` (auto-liquidante, = v1.0.0). Ver `docs/specs/spec-v1.1.0.md` e ADR 0004.
 
 ### Documentação interativa (Swagger)
 A API expõe **Swagger UI** em `http://localhost:8080/swagger/index.html` e o spec em `/swagger/doc.json`, gerados via **swaggo** a partir das anotações nos handlers. Regenerar após alterar rotas:
@@ -104,7 +112,7 @@ curl -X POST localhost:8080/accounts -H "Authorization: Bearer $TOKEN"
 ```bash
 go test ./...            # sobe PostgreSQL real via testcontainers-go
 ```
-Cobrem atomicidade (CA1), concorrência com optimistic lock (CA2) e idempotência (CA3).
+Cobrem atomicidade (CA1), concorrência com optimistic lock (CA2), idempotência (CA3) e a fronteira de liquidação: POST external deixa PENDING (CA6), settle idempotente (CA7), fail com estorno append-only (CA8) e RBAC da role SETTLEMENT (CA9).
 
 ## Status
-Fase 3 (polish) em andamento. Concluído: auth JWT, conta, depósito/saque, transferência atômica com optimistic lock, ledger append-only, idempotência, testes de integração (testcontainers), admin, **Swagger (swaggo)**, consulta de transferências e fronteira `GET /admin/transfers?status=PENDING` para o Liquida. Spec v1.0.0.
+v1.0.0 completa. **v1.1.0 (fronteira de liquidação com o Liquida)** implementada: modo `standalone`/`external`, auth M2M via client-credentials (JWT `SETTLEMENT`, TTL curto), `PATCH /transfers/{id}/settle` e `/fail` com estorno append-only, `GET /transfers?status=PENDING`. Ver `docs/specs/spec-v1.1.0.md` e ADR 0004.
