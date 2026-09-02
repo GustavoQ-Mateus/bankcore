@@ -17,8 +17,9 @@ import (
 type Role string
 
 const (
-	RoleCustomer Role = "CUSTOMER"
-	RoleAdmin    Role = "ADMIN"
+	RoleCustomer   Role = "CUSTOMER"
+	RoleAdmin      Role = "ADMIN"
+	RoleSettlement Role = "SETTLEMENT"
 )
 
 type Customer struct {
@@ -34,14 +35,16 @@ type Service struct {
 	pool       *pgxpool.Pool
 	jwtSecret  []byte
 	jwtTTL     time.Duration
+	serviceTTL time.Duration
 	bcryptCost int
 }
 
-func NewService(pool *pgxpool.Pool, jwtSecret string, jwtTTL time.Duration, bcryptCost int) *Service {
+func NewService(pool *pgxpool.Pool, jwtSecret string, jwtTTL, serviceTTL time.Duration, bcryptCost int) *Service {
 	return &Service{
 		pool:       pool,
 		jwtSecret:  []byte(jwtSecret),
 		jwtTTL:     jwtTTL,
+		serviceTTL: serviceTTL,
 		bcryptCost: bcryptCost,
 	}
 }

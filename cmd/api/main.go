@@ -25,8 +25,8 @@ import (
 )
 
 // @title           BankCore API
-// @version         1.0.0
-// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64.
+// @version         1.1.0
+// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004).
 // @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey  BearerAuth
@@ -52,9 +52,14 @@ func run() error {
 	}
 	defer pool.Close()
 
-	authSvc := auth.NewService(pool, cfg.JWTSecret, cfg.JWTTTL, cfg.BcryptCost)
+	authSvc := auth.NewService(pool, cfg.JWTSecret, cfg.JWTTTL, cfg.ServiceJWTTTL, cfg.BcryptCost)
 	accountSvc := account.NewService(pool)
-	transferSvc := transfer.NewService(pool)
+
+	var transferOpts []transfer.Option
+	if cfg.LiquidaExternal {
+		transferOpts = append(transferOpts, transfer.WithExternalSettlement())
+	}
+	transferSvc := transfer.NewService(pool, transferOpts...)
 
 	authHandler := auth.NewHandler(authSvc)
 	accountHandler := account.NewHandler(accountSvc)
@@ -90,6 +95,7 @@ func run() error {
 			r.Route("/admin", func(r chi.Router) {
 				accountHandler.AdminRoutes(r)
 				transferHandler.AdminRoutes(r)
+				authHandler.AdminRoutes(r)
 			})
 		})
 	})

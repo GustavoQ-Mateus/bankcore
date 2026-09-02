@@ -8,11 +8,13 @@ import (
 )
 
 type Config struct {
-	HTTPAddr    string
-	DatabaseURL string
-	JWTSecret   string
-	JWTTTL      time.Duration
-	BcryptCost  int
+	HTTPAddr        string
+	DatabaseURL     string
+	JWTSecret       string
+	JWTTTL          time.Duration
+	ServiceJWTTTL   time.Duration
+	BcryptCost      int
+	LiquidaExternal bool
 }
 
 func Load() (Config, error) {
@@ -28,11 +30,27 @@ func Load() (Config, error) {
 	}
 	cfg.JWTTTL = ttl
 
+	serviceTTL, err := time.ParseDuration(getenv("SERVICE_JWT_TTL", "15m"))
+	if err != nil {
+		return Config{}, fmt.Errorf("SERVICE_JWT_TTL inválido: %w", err)
+	}
+	cfg.ServiceJWTTTL = serviceTTL
+
 	cost, err := strconv.Atoi(getenv("BCRYPT_COST", "10"))
 	if err != nil {
 		return Config{}, fmt.Errorf("BCRYPT_COST inválido: %w", err)
 	}
 	cfg.BcryptCost = cost
+
+	mode := getenv("LIQUIDA_INTEGRATION", "standalone")
+	switch mode {
+	case "standalone":
+		cfg.LiquidaExternal = false
+	case "external":
+		cfg.LiquidaExternal = true
+	default:
+		return Config{}, fmt.Errorf("LIQUIDA_INTEGRATION inválido: %q (use standalone ou external)", mode)
+	}
 
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "dev-insecure-secret-change-me"

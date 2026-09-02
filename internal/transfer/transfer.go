@@ -25,20 +25,33 @@ const (
 )
 
 type Transfer struct {
-	ID            uuid.UUID `json:"id"`
-	FromAccountID uuid.UUID `json:"from_account_id"`
-	ToAccountID   uuid.UUID `json:"to_account_id"`
-	AmountCents   int64     `json:"amount_cents"`
-	Status        Status    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            uuid.UUID  `json:"id"`
+	FromAccountID uuid.UUID  `json:"from_account_id"`
+	ToAccountID   uuid.UUID  `json:"to_account_id"`
+	AmountCents   int64      `json:"amount_cents"`
+	Status        Status     `json:"status"`
+	SettledAt     *time.Time `json:"settled_at,omitempty"`
+	SettlementRef *string    `json:"settlement_ref,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 type Service struct {
-	pool *pgxpool.Pool
+	pool     *pgxpool.Pool
+	external bool
 }
 
-func NewService(pool *pgxpool.Pool) *Service {
-	return &Service{pool: pool}
+type Option func(*Service)
+
+func WithExternalSettlement() Option {
+	return func(s *Service) { s.external = true }
+}
+
+func NewService(pool *pgxpool.Pool, opts ...Option) *Service {
+	s := &Service{pool: pool}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 var errVersionConflict = errors.New("version conflict")
@@ -100,7 +113,11 @@ func (s *Service) process(ctx context.Context, t Transfer) (Transfer, error) {
 	for i := 0; i < maxRetries; i++ {
 		err := s.processOnce(ctx, t)
 		if err == nil {
-			t.Status = StatusSettled
+			if s.external {
+				t.Status = StatusPending
+			} else {
+				t.Status = StatusSettled
+			}
 			return t, nil
 		}
 		if errors.Is(err, errVersionConflict) {
@@ -133,6 +150,14 @@ func (s *Service) processOnce(ctx context.Context, t Transfer) error {
 	}
 	if current == StatusFailed {
 		return httpx.ErrValidation("transferência já falhou")
+	}
+
+	var booked int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM entries WHERE transfer_id = $1`, t.ID).Scan(&booked); err != nil {
+		return httpx.ErrInternal
+	}
+	if booked > 0 {
+		return nil
 	}
 
 	first, second := order(t.FromAccountID, t.ToAccountID)
@@ -177,8 +202,10 @@ func (s *Service) processOnce(ctx context.Context, t Transfer) error {
 		return httpx.ErrInternal
 	}
 
-	if _, err := tx.Exec(ctx, `UPDATE transfers SET status = 'SETTLED' WHERE id = $1`, t.ID); err != nil {
-		return httpx.ErrInternal
+	if !s.external {
+		if _, err := tx.Exec(ctx, `UPDATE transfers SET status = 'SETTLED' WHERE id = $1`, t.ID); err != nil {
+			return httpx.ErrInternal
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -226,12 +253,16 @@ func (s *Service) markFailed(ctx context.Context, id uuid.UUID) {
 	_, _ = s.pool.Exec(ctx, `UPDATE transfers SET status = 'FAILED' WHERE id = $1`, id)
 }
 
+const transferCols = `id, from_account_id, to_account_id, amount_cents, status, settled_at, settlement_ref, created_at`
+
+func scanTransfer(row pgx.Row, t *Transfer) error {
+	return row.Scan(&t.ID, &t.FromAccountID, &t.ToAccountID, &t.AmountCents, &t.Status, &t.SettledAt, &t.SettlementRef, &t.CreatedAt)
+}
+
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (Transfer, error) {
 	var t Transfer
-	err := s.pool.QueryRow(ctx,
-		`SELECT id, from_account_id, to_account_id, amount_cents, status, created_at
-		 FROM transfers WHERE id = $1`, id,
-	).Scan(&t.ID, &t.FromAccountID, &t.ToAccountID, &t.AmountCents, &t.Status, &t.CreatedAt)
+	err := scanTransfer(s.pool.QueryRow(ctx,
+		`SELECT `+transferCols+` FROM transfers WHERE id = $1`, id), &t)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Transfer{}, httpx.ErrNotFound
@@ -243,10 +274,7 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Transfer, error) {
 
 func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset int) ([]Transfer, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id, from_account_id, to_account_id, amount_cents, status, created_at
-		 FROM transfers WHERE status = $1
-		 ORDER BY created_at ASC
-		 LIMIT $2 OFFSET $3`,
+		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
 		status, limit, offset,
 	)
 	if err != nil {
@@ -257,7 +285,7 @@ func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset
 	transfers := make([]Transfer, 0, limit)
 	for rows.Next() {
 		var t Transfer
-		if err := rows.Scan(&t.ID, &t.FromAccountID, &t.ToAccountID, &t.AmountCents, &t.Status, &t.CreatedAt); err != nil {
+		if err := scanTransfer(rows, &t); err != nil {
 			return nil, httpx.ErrInternal
 		}
 		transfers = append(transfers, t)
@@ -266,6 +294,151 @@ func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset
 		return nil, httpx.ErrInternal
 	}
 	return transfers, nil
+}
+
+func (s *Service) ListByStatusForOwner(ctx context.Context, status Status, ownerID uuid.UUID, limit, offset int) ([]Transfer, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT `+transferCols+` FROM transfers t
+		 WHERE t.status = $1
+		   AND EXISTS (SELECT 1 FROM accounts a WHERE a.owner_id = $2 AND a.id IN (t.from_account_id, t.to_account_id))
+		 ORDER BY t.created_at ASC LIMIT $3 OFFSET $4`,
+		status, ownerID, limit, offset,
+	)
+	if err != nil {
+		return nil, httpx.ErrInternal
+	}
+	defer rows.Close()
+
+	transfers := make([]Transfer, 0, limit)
+	for rows.Next() {
+		var t Transfer
+		if err := scanTransfer(rows, &t); err != nil {
+			return nil, httpx.ErrInternal
+		}
+		transfers = append(transfers, t)
+	}
+	if rows.Err() != nil {
+		return nil, httpx.ErrInternal
+	}
+	return transfers, nil
+}
+
+func (s *Service) Settle(ctx context.Context, id uuid.UUID, ref string) (Transfer, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Transfer{}, httpx.ErrInternal
+	}
+	defer tx.Rollback(ctx)
+
+	var current Status
+	if err := tx.QueryRow(ctx, `SELECT status FROM transfers WHERE id = $1 FOR UPDATE`, id).Scan(&current); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Transfer{}, httpx.ErrNotFound
+		}
+		return Transfer{}, httpx.ErrInternal
+	}
+
+	switch current {
+	case StatusFailed:
+		return Transfer{}, httpx.ErrConflict("transferência falhou e não pode ser liquidada")
+	case StatusPending:
+		var refArg any
+		if ref != "" {
+			refArg = ref
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE transfers SET status = 'SETTLED', settled_at = now(), settlement_ref = $2 WHERE id = $1`,
+			id, refArg,
+		); err != nil {
+			return Transfer{}, httpx.ErrInternal
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Transfer{}, httpx.ErrInternal
+	}
+	return s.Get(ctx, id)
+}
+
+func (s *Service) Fail(ctx context.Context, id uuid.UUID) (Transfer, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Transfer{}, httpx.ErrInternal
+	}
+	defer tx.Rollback(ctx)
+
+	var (
+		current  Status
+		from, to uuid.UUID
+		amount   int64
+	)
+	if err := tx.QueryRow(ctx,
+		`SELECT status, from_account_id, to_account_id, amount_cents FROM transfers WHERE id = $1 FOR UPDATE`, id,
+	).Scan(&current, &from, &to, &amount); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Transfer{}, httpx.ErrNotFound
+		}
+		return Transfer{}, httpx.ErrInternal
+	}
+
+	switch current {
+	case StatusSettled:
+		return Transfer{}, httpx.ErrConflict("transferência já liquidada e não pode falhar")
+	case StatusPending:
+		if err := s.reverse(ctx, tx, id, from, to, amount); err != nil {
+			return Transfer{}, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE transfers SET status = 'FAILED' WHERE id = $1`, id); err != nil {
+			return Transfer{}, httpx.ErrInternal
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Transfer{}, httpx.ErrInternal
+	}
+	return s.Get(ctx, id)
+}
+
+func (s *Service) reverse(ctx context.Context, tx pgx.Tx, id, from, to uuid.UUID, amount int64) error {
+	var booked int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM entries WHERE transfer_id = $1`, id).Scan(&booked); err != nil {
+		return httpx.ErrInternal
+	}
+	if booked == 0 {
+		return nil
+	}
+
+	first, second := order(from, to)
+	accs := map[uuid.UUID]lockedAccount{}
+	for _, acc := range []uuid.UUID{first, second} {
+		var a lockedAccount
+		if err := tx.QueryRow(ctx,
+			`SELECT balance_cents, version, status FROM accounts WHERE id = $1 FOR UPDATE`, acc,
+		).Scan(&a.balance, &a.version, &a.status); err != nil {
+			return httpx.ErrInternal
+		}
+		accs[acc] = a
+	}
+
+	toNew := accs[to].balance - amount
+	if toNew < 0 {
+		return httpx.ErrConflict("estorno impossível: saldo do destino insuficiente")
+	}
+	fromNew := accs[from].balance + amount
+
+	if err := optimisticUpdate(ctx, tx, from, fromNew, accs[from].version); err != nil {
+		return err
+	}
+	if err := optimisticUpdate(ctx, tx, to, toNew, accs[to].version); err != nil {
+		return err
+	}
+	if err := ledger.Append(ctx, tx, from, ledger.Credit, amount, fromNew, &id); err != nil {
+		return httpx.ErrInternal
+	}
+	if err := ledger.Append(ctx, tx, to, ledger.Debit, amount, toNew, &id); err != nil {
+		return httpx.ErrInternal
+	}
+	return nil
 }
 
 func (s *Service) findByKey(ctx context.Context, key string) (Transfer, error) {

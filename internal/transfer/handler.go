@@ -23,7 +23,13 @@ func NewHandler(svc *Service, ownerOf func(r *http.Request, id uuid.UUID) (uuid.
 
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/", h.create)
+	r.Get("/", h.listMine)
 	r.Get("/{id}", h.get)
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireRole(auth.RoleSettlement))
+		r.Patch("/{id}/settle", h.settle)
+		r.Patch("/{id}/fail", h.fail)
+	})
 }
 
 func (h *Handler) AdminRoutes(r chi.Router) {
@@ -130,13 +136,7 @@ func (h *Handler) adminList(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, httpx.ErrValidation("status deve ser PENDING, SETTLED ou FAILED"))
 		return
 	}
-	page := 1
-	if p := r.URL.Query().Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
-		}
-	}
-	const pageSize = 50
+	page := pageParam(r)
 	transfers, err := h.svc.ListByStatus(r.Context(), status, pageSize, (page-1)*pageSize)
 	if err != nil {
 		httpx.Error(w, err)
@@ -147,6 +147,110 @@ func (h *Handler) adminList(w http.ResponseWriter, r *http.Request) {
 		"status":    status,
 		"transfers": transfers,
 	})
+}
+
+// listMine godoc
+// @Summary  Listar minhas transferências por status
+// @Tags     transfers
+// @Produce  json
+// @Security BearerAuth
+// @Param    status  query     string  true   "PENDING, SETTLED ou FAILED"
+// @Param    page    query     int     false  "página"
+// @Success  200     {object}  map[string]any
+// @Router   /transfers [get]
+func (h *Handler) listMine(w http.ResponseWriter, r *http.Request) {
+	status := Status(r.URL.Query().Get("status"))
+	if status != StatusPending && status != StatusSettled && status != StatusFailed {
+		httpx.Error(w, httpx.ErrValidation("status deve ser PENDING, SETTLED ou FAILED"))
+		return
+	}
+	userID, _ := auth.UserIDFrom(r.Context())
+	page := pageParam(r)
+	transfers, err := h.svc.ListByStatusForOwner(r.Context(), status, userID, pageSize, (page-1)*pageSize)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"page":      page,
+		"status":    status,
+		"transfers": transfers,
+	})
+}
+
+type settleRequest struct {
+	SettlementRef string `json:"settlement_ref"`
+}
+
+// settle godoc
+// @Summary  Confirmar liquidação (SETTLEMENT)
+// @Tags     settlement
+// @Accept   json
+// @Produce  json
+// @Security BearerAuth
+// @Param    id    path      string         true   "transfer id"
+// @Param    body  body      settleRequest  false  "referência da liquidação"
+// @Success  200   {object}  Transfer
+// @Failure  403   {object}  map[string]any
+// @Failure  404   {object}  map[string]any
+// @Failure  409   {object}  map[string]any
+// @Router   /transfers/{id}/settle [patch]
+func (h *Handler) settle(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, httpx.ErrValidation("id inválido"))
+		return
+	}
+	var req settleRequest
+	if r.ContentLength > 0 {
+		if err := httpx.Decode(r, &req); err != nil {
+			httpx.Error(w, err)
+			return
+		}
+	}
+	t, err := h.svc.Settle(r.Context(), id, req.SettlementRef)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, t)
+}
+
+// fail godoc
+// @Summary  Falhar liquidação com estorno (SETTLEMENT)
+// @Tags     settlement
+// @Produce  json
+// @Security BearerAuth
+// @Param    id   path      string  true  "transfer id"
+// @Success  200  {object}  Transfer
+// @Failure  403  {object}  map[string]any
+// @Failure  404  {object}  map[string]any
+// @Failure  409  {object}  map[string]any
+// @Router   /transfers/{id}/fail [patch]
+func (h *Handler) fail(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.Error(w, httpx.ErrValidation("id inválido"))
+		return
+	}
+	t, err := h.svc.Fail(r.Context(), id)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, t)
+}
+
+const pageSize = 50
+
+func pageParam(r *http.Request) int {
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	return page
 }
 
 func (h *Handler) authorizeParticipant(r *http.Request, t Transfer) error {
