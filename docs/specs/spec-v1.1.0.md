@@ -26,15 +26,17 @@ Permitir que o Liquida (a) descubra as transferências pendentes de liquidação
 2. **Descoberta de pendências**: `GET /transfers?status=PENDING` para o cliente (participante) e `GET /admin/transfers?status=` para operação (este último já entregue na Fase 3 da v1.0.0).
 3. **Confirmação de liquidação**: `PATCH /transfers/{id}/settle`, chamado pelo Liquida, transição `PENDING → SETTLED`, idempotente.
 4. **Falha de liquidação**: `PATCH /transfers/{id}/fail`, transição `PENDING → FAILED` com estorno compensatório no ledger (ver §7).
-5. **Credencial de serviço** para o Liquida (role `SETTLEMENT`), distinta de `CUSTOMER`/`ADMIN`.
+5. **Credencial de serviço (M2M)** para o Liquida: fluxo **client-credentials** (`POST /auth/token`) que emite JWT `role=SETTLEMENT` com **TTL curto**, distinto de `CUSTOMER`/`ADMIN`. Sem token estático/eterno (ver ADR 0004).
 
 ## 4. Stack
 Igual à v1.0.0. Sem novas dependências obrigatórias. A credencial de serviço reutiliza o JWT existente com uma nova role.
 
 ## 5. Modelo de dados (delta sobre a v1.0.0)
 ```
-transfers (... , status[PENDING|SETTLED|FAILED], settled_at timestamptz?, settlement_ref text?)
+transfers       (... , status[PENDING|SETTLED|FAILED], settled_at timestamptz?, settlement_ref text?)
+service_clients (id uuid, client_id text UNIQUE, secret_hash text, role, created_at)  -- credencial M2M do Liquida
 ```
+- **`service_clients`**: identidade de serviço para o fluxo client-credentials. `secret` é gerado no servidor, **exibido uma única vez** na criação e persistido apenas como **bcrypt hash** (mesmo mecanismo de `customers.password_hash`). Rotacionável/revogável por linha, sem redeploy.
 - **`settled_at`**: quando a liquidação externa foi confirmada (NULL enquanto `PENDING`).
 - **`settlement_ref`**: referência opcional devolvida pelo Liquida (id da liquidação do lado dele), para rastreabilidade ponta a ponta.
 - **Semântica do `status` na 1.1.0** (ver ADR 0004): o **movimento monetário continua atômico e imutável no `POST`** (saldo + dois lançamentos no ledger). O `status` passa a refletir o **ciclo de liquidação externa**:
@@ -43,6 +45,8 @@ transfers (... , status[PENDING|SETTLED|FAILED], settled_at timestamptz?, settle
 - Nenhuma coluna existente muda de tipo ou é removida. `settled_at`/`settlement_ref` entram por migration aditiva (`0002_settlement.up.sql`).
 
 ## 6. Endpoints (delta)
+- `POST /admin/service-clients` — **role `ADMIN`** — provisiona a credencial do Liquida. Retorna `client_id` + `client_secret` **uma única vez** (o servidor só guarda o hash).
+- `POST /auth/token` — **client-credentials grant**. Body `{ "client_id", "client_secret" }` → JWT `role=SETTLEMENT` com **TTL curto** (`SERVICE_JWT_TTL`, default 15m). Pública (autentica pela própria credencial), mas só emite token se o par bater com o hash.
 - `GET /transfers?status=PENDING&page=` — participante lista suas transferências pendentes (novo, cliente).
 - `PATCH /transfers/{id}/settle` — **role `SETTLEMENT`** — confirma liquidação. Body opcional `{ "settlement_ref": "..." }`. Header `Idempotency-Key` recomendado.
 - `PATCH /transfers/{id}/fail` — **role `SETTLEMENT`** — marca falha de liquidação e dispara estorno compensatório.
@@ -73,18 +77,21 @@ transfers (... , status[PENDING|SETTLED|FAILED], settled_at timestamptz?, settle
 - Assinatura/mTLS entre serviços — a v1.1.0 usa JWT com role de serviço; hardening de transporte fica para versão futura.
 
 ## 11. Plano de implementação (fases da 1.1.0)
-1. **Migration aditiva** `0002_settlement.up.sql`: `settled_at`, `settlement_ref`; sem alterar dados existentes.
-2. **Config** `LIQUIDA_INTEGRATION` (default `standalone`) e propagação ao `transfer.Service`.
-3. **POST em modo external**: parar de auto-marcar `SETTLED`; deixar `PENDING` após o commit do movimento.
-4. **Endpoints** `PATCH /settle` e `/fail` + role `SETTLEMENT` no middleware de auth.
-5. **`GET /transfers?status=PENDING`** para o cliente (filtrado pelos participantes).
-6. **Testes testcontainers** para CA6–CA10, incluindo idempotência do settle e o estorno do fail.
-7. **Swagger** regenerado e README/diagrama atualizados com o fluxo de liquidação.
+1. **Migration aditiva** `0002_settlement.up.sql`: `settled_at`, `settlement_ref` em `transfers` e tabela `service_clients`; sem alterar dados existentes.
+2. **Config** `LIQUIDA_INTEGRATION` (default `standalone`), `SERVICE_JWT_TTL` (default 15m); propagação ao `transfer.Service` e ao `auth.Service`.
+3. **Auth M2M**: role `SETTLEMENT`, provisionamento `POST /admin/service-clients` (secret gerado, hash persistido) e `POST /auth/token` (client-credentials, TTL curto).
+4. **POST em modo external**: parar de auto-marcar `SETTLED`; deixar `PENDING` após o commit do movimento.
+5. **Endpoints** `PATCH /settle` e `/fail` protegidos por `RequireRole(SETTLEMENT)`.
+6. **`GET /transfers?status=PENDING`** para o cliente (filtrado pelos participantes).
+7. **Testes testcontainers** para CA6–CA10, incluindo emissão/expiração do token de serviço, idempotência do settle e o estorno do fail.
+8. **Swagger** regenerado e README/diagrama atualizados com o fluxo de liquidação.
 
 ## 12. Referências
 - ADR 0004 — Fronteira de liquidação com o Liquida (novo nesta versão).
 - ADR 0001 (optimistic locking), 0002 (dinheiro int64), 0003 (idempotência) — inalteradas e válidas.
 - ADR 0003 do Liquida — modelo de status `PENDING/SETTLED` do lado consumidor.
+
+> **Nota de versionamento entre repos:** este "v1.1.0" é do **BankCore**. Do lado do **Liquida**, a integração com o BankCore está marcada como **v2.0.0** (spec §13/§14 + ADR 0003 dele); o "v1.1.0" do Liquida é o dashboard. Quando o contrato do `/settle` fechar, ele entra numa `spec-v2.0.0.md` no repo do Liquida referenciando a ADR 0003 dele. Não confundir os dois "v1.1.0" ao cruzar os PRs.
 
 ---
 

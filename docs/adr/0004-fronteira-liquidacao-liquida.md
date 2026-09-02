@@ -19,6 +19,14 @@ O `status` da transferência passa a ter dois significados conforme o modo, docu
 - **Append-only respeitado (ADR/RNF5)**: o `fail` não reescreve os lançamentos originais — gera um **par de estorno** (crédito na origem, débito no destino) numa nova transação, mantendo `saldo = soma(lançamentos)`.
 - **Pull em vez de push**: o Liquida puxa pendências por polling; o BankCore não precisa conhecer o endpoint do Liquida na v1.1.0, reduzindo acoplamento.
 
+## Autenticação da fronteira (M2M)
+A credencial do Liquida é **JWT com role `SETTLEMENT`**, emitido por um fluxo **client-credentials** próprio: `POST /auth/token` recebe `client_id`/`client_secret`, valida contra o bcrypt hash em `service_clients` e devolve um JWT com **TTL curto** (`SERVICE_JWT_TTL`, default 15m).
+
+- **Condição inegociável**: JWT service-role só é superior a uma API key porque há **emissão real com expiração**. Um JWT estático/eterno enfiado no env seria "uma API key fantasiada de JWT" — mesma superfície de risco, mais cerimônia. Por isso a decisão exige o endpoint de client-credentials com TTL curto; sem ele, a escolha correta seria uma API key dedicada validada por hash.
+- **Reaproveitamento do RBAC**: `SETTLEMENT` é só mais uma claim de role; `RequireRole(SETTLEMENT)` é o mesmo middleware do RBAC de usuário. Nenhum segundo mecanismo de auth para construir, testar, revogar e auditar em paralelo.
+- **Provisionamento**: `POST /admin/service-clients` (role `ADMIN`) gera o `client_secret` no servidor, exibe **uma única vez** e persiste apenas o hash. Rotação/revogação por linha em `service_clients`, sem redeploy. O Liquida guarda o secret no seu próprio secret store — **nunca no código**.
+- **Idempotência ortogonal ao auth**: a `Idempotency-Key`/`transfer_id` = `transacao_id` do Liquida (ADR 0003) segue como chave ponta a ponta, independente do mecanismo de token.
+
 ## Alternativas consideradas
 - **Autorização em duas fases (POST só reserva, dinheiro move no settle)**: rejeitada — quebraria a semântica de atomicidade da v1.0.0, exigiria estado de "reserva" e seria um MAJOR.
 - **Novo campo `settlement_status` separado de `status`**: rejeitada por ora — dobraria a máquina de estados sem ganho na v1.1.0, já que o Liquida consome o modelo `PENDING/SETTLED` (ADR 0003 do Liquida). Reavaliar se surgir necessidade de distinguir "movido internamente" de "liquidado externamente" num mesmo registro.
