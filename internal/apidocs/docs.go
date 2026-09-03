@@ -33,7 +33,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "401": {
@@ -73,7 +73,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "403": {
@@ -124,7 +124,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_account.amountRequest"
+                            "$ref": "#/definitions/account.amountRequest"
                         }
                     }
                 ],
@@ -132,7 +132,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "400": {
@@ -223,7 +223,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_account.amountRequest"
+                            "$ref": "#/definitions/account.amountRequest"
                         }
                     }
                 ],
@@ -231,7 +231,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "400": {
@@ -271,7 +271,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_account.Account"
+                                "$ref": "#/definitions/account.Account"
                             }
                         }
                     },
@@ -316,7 +316,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_account.statusRequest"
+                            "$ref": "#/definitions/account.statusRequest"
                         }
                     }
                 ],
@@ -324,7 +324,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "403": {
@@ -443,7 +443,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.loginRequest"
+                            "$ref": "#/definitions/auth.loginRequest"
                         }
                     }
                 ],
@@ -484,7 +484,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.registerRequest"
+                            "$ref": "#/definitions/auth.registerRequest"
                         }
                     }
                 ],
@@ -492,7 +492,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.Customer"
+                            "$ref": "#/definitions/auth.Customer"
                         }
                     },
                     "400": {
@@ -532,7 +532,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.tokenRequest"
+                            "$ref": "#/definitions/auth.tokenRequest"
                         }
                     }
                 ],
@@ -670,7 +670,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.transferRequest"
+                            "$ref": "#/definitions/transfer.transferRequest"
                         }
                     }
                 ],
@@ -678,7 +678,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "400": {
@@ -732,7 +732,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "403": {
@@ -759,6 +759,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "PENDING→FAILED com estorno append-only. Repetir sobre FAILED é no-op idempotente (200). Sobre SETTLED retorna 409 com error.code=FAIL_ON_SETTLED.",
                 "produces": [
                     "application/json"
                 ],
@@ -779,7 +780,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "403": {
@@ -797,7 +798,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "error.code=FAIL_ON_SETTLED",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -813,6 +814,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED.",
                 "consumes": [
                     "application/json"
                 ],
@@ -836,7 +838,7 @@ const docTemplate = `{
                         "name": "body",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.settleRequest"
+                            "$ref": "#/definitions/transfer.settleRequest"
                         }
                     }
                 ],
@@ -844,7 +846,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "403": {
@@ -862,7 +864,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "error.code=SETTLE_ON_FAILED",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -873,7 +875,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_account.Account": {
+        "account.Account": {
             "type": "object",
             "properties": {
                 "balance_cents": {
@@ -892,14 +894,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/internal_account.Status"
+                    "$ref": "#/definitions/account.Status"
                 },
                 "version": {
                     "type": "integer"
                 }
             }
         },
-        "internal_account.Status": {
+        "account.Status": {
             "type": "string",
             "enum": [
                 "ACTIVE",
@@ -910,7 +912,7 @@ const docTemplate = `{
                 "StatusBlocked"
             ]
         },
-        "internal_account.amountRequest": {
+        "account.amountRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -918,15 +920,15 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_account.statusRequest": {
+        "account.statusRequest": {
             "type": "object",
             "properties": {
                 "status": {
-                    "$ref": "#/definitions/internal_account.Status"
+                    "$ref": "#/definitions/account.Status"
                 }
             }
         },
-        "internal_auth.Customer": {
+        "auth.Customer": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -942,11 +944,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/internal_auth.Role"
+                    "$ref": "#/definitions/auth.Role"
                 }
             }
         },
-        "internal_auth.Role": {
+        "auth.Role": {
             "type": "string",
             "enum": [
                 "CUSTOMER",
@@ -959,7 +961,7 @@ const docTemplate = `{
                 "RoleSettlement"
             ]
         },
-        "internal_auth.loginRequest": {
+        "auth.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -970,7 +972,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_auth.registerRequest": {
+        "auth.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -983,11 +985,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/internal_auth.Role"
+                    "$ref": "#/definitions/auth.Role"
                 }
             }
         },
-        "internal_auth.tokenRequest": {
+        "auth.tokenRequest": {
             "type": "object",
             "properties": {
                 "client_id": {
@@ -998,7 +1000,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_transfer.Status": {
+        "transfer.Status": {
             "type": "string",
             "enum": [
                 "PENDING",
@@ -1011,7 +1013,7 @@ const docTemplate = `{
                 "StatusFailed"
             ]
         },
-        "internal_transfer.Transfer": {
+        "transfer.Transfer": {
             "type": "object",
             "properties": {
                 "amount_cents": {
@@ -1033,14 +1035,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/internal_transfer.Status"
+                    "$ref": "#/definitions/transfer.Status"
                 },
                 "to_account_id": {
                     "type": "string"
                 }
             }
         },
-        "internal_transfer.settleRequest": {
+        "transfer.settleRequest": {
             "type": "object",
             "properties": {
                 "settlement_ref": {
@@ -1048,7 +1050,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_transfer.transferRequest": {
+        "transfer.transferRequest": {
             "type": "object",
             "properties": {
                 "amount": {

@@ -46,11 +46,12 @@ service_clients (id uuid, client_id text UNIQUE, secret_hash text, role, created
 
 ## 6. Endpoints (delta)
 - `POST /admin/service-clients` — **role `ADMIN`** — provisiona a credencial do Liquida. Retorna `client_id` + `client_secret` **uma única vez** (o servidor só guarda o hash).
-- `POST /auth/token` — **client-credentials grant**. Body `{ "client_id", "client_secret" }` → JWT `role=SETTLEMENT` com **TTL curto** (`SERVICE_JWT_TTL`, default 15m). Pública (autentica pela própria credencial), mas só emite token se o par bater com o hash.
-- `GET /settlement/transfers?status=PENDING&page=` — **role `SETTLEMENT`** — backlog de liquidação para o Liquida (least-privilege, sem ADMIN). Paginação offset (`page`, `page_size` fixo 50) e `has_next` na resposta. Mesmo schema de `Transfer`.
+- `POST /auth/token` — **client-credentials grant**. `Content-Type: application/json`, body **exatamente** `{ "client_id", "client_secret" }` (decoder rejeita campos desconhecidos — não enviar `grant_type`). Resposta `{ "token", "token_type": "Bearer", "expires_in": <segundos> }`, JWT `role=SETTLEMENT` com **TTL curto** (`SERVICE_JWT_TTL`, default 15m). Pública (autentica pela própria credencial), mas só emite token se o par bater com o hash.
+- `GET /settlement/transfers?status=PENDING&page=` — **role `SETTLEMENT`** — backlog de liquidação para o Liquida (least-privilege, sem ADMIN). **Ordenação FIFO estável** (`ORDER BY created_at ASC, id ASC`) para paginação offset determinística. Paginação offset (`page`, `page_size` fixo 50) e `has_next` na resposta. Envelope: `{ page, page_size, has_next, status, transfers[] }` (array sob `transfers`, valor em `amount_cents` int64).
 - `GET /transfers?status=PENDING&page=` — participante lista suas transferências pendentes (novo, cliente).
-- `PATCH /transfers/{id}/settle` — **role `SETTLEMENT`** — confirma liquidação. Body opcional `{ "settlement_ref": "..." }`. Header `Idempotency-Key` recomendado.
-- `PATCH /transfers/{id}/fail` — **role `SETTLEMENT`** — marca falha de liquidação e dispara estorno compensatório.
+- `PATCH /transfers/{id}/settle` — **role `SETTLEMENT`** — confirma liquidação. Body opcional `{ "settlement_ref": "..." }`. Conflito sobre `FAILED` → **409 `error.code=SETTLE_ON_FAILED`**.
+- `PATCH /transfers/{id}/fail` — **role `SETTLEMENT`** — marca falha de liquidação e dispara estorno compensatório. Conflito sobre `SETTLED` → **409 `error.code=FAIL_ON_SETTLED`**.
+- **Contrato de erro**: shape `{ "error": { "code", "message" } }`. Códigos de transição inválida são distintos (`SETTLE_ON_FAILED`/`FAIL_ON_SETTLED`) para roteamento determinístico pelo consumidor (DLQ), reservando `CONFLICT` genérico para conflitos futuros.
 - Reaproveitados da v1.0.0/Fase 3: `GET /transfers/{id}`, `GET /admin/transfers?status=`.
 
 ## 7. Requisitos funcionais (incremento)

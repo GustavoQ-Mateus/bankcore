@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  internal_account.Account:
+  account.Account:
     properties:
       balance_cents:
         type: integer
@@ -13,11 +13,11 @@ definitions:
       owner_id:
         type: string
       status:
-        $ref: '#/definitions/internal_account.Status'
+        $ref: '#/definitions/account.Status'
       version:
         type: integer
     type: object
-  internal_account.Status:
+  account.Status:
     enum:
     - ACTIVE
     - BLOCKED
@@ -25,17 +25,17 @@ definitions:
     x-enum-varnames:
     - StatusActive
     - StatusBlocked
-  internal_account.amountRequest:
+  account.amountRequest:
     properties:
       amount:
         type: string
     type: object
-  internal_account.statusRequest:
+  account.statusRequest:
     properties:
       status:
-        $ref: '#/definitions/internal_account.Status'
+        $ref: '#/definitions/account.Status'
     type: object
-  internal_auth.Customer:
+  auth.Customer:
     properties:
       created_at:
         type: string
@@ -46,9 +46,9 @@ definitions:
       name:
         type: string
       role:
-        $ref: '#/definitions/internal_auth.Role'
+        $ref: '#/definitions/auth.Role'
     type: object
-  internal_auth.Role:
+  auth.Role:
     enum:
     - CUSTOMER
     - ADMIN
@@ -58,14 +58,14 @@ definitions:
     - RoleCustomer
     - RoleAdmin
     - RoleSettlement
-  internal_auth.loginRequest:
+  auth.loginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  internal_auth.registerRequest:
+  auth.registerRequest:
     properties:
       email:
         type: string
@@ -74,16 +74,16 @@ definitions:
       password:
         type: string
       role:
-        $ref: '#/definitions/internal_auth.Role'
+        $ref: '#/definitions/auth.Role'
     type: object
-  internal_auth.tokenRequest:
+  auth.tokenRequest:
     properties:
       client_id:
         type: string
       client_secret:
         type: string
     type: object
-  internal_transfer.Status:
+  transfer.Status:
     enum:
     - PENDING
     - SETTLED
@@ -93,7 +93,7 @@ definitions:
     - StatusPending
     - StatusSettled
     - StatusFailed
-  internal_transfer.Transfer:
+  transfer.Transfer:
     properties:
       amount_cents:
         type: integer
@@ -108,16 +108,16 @@ definitions:
       settlement_ref:
         type: string
       status:
-        $ref: '#/definitions/internal_transfer.Status'
+        $ref: '#/definitions/transfer.Status'
       to_account_id:
         type: string
     type: object
-  internal_transfer.settleRequest:
+  transfer.settleRequest:
     properties:
       settlement_ref:
         type: string
     type: object
-  internal_transfer.transferRequest:
+  transfer.transferRequest:
     properties:
       amount:
         type: string
@@ -144,7 +144,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_account.Account'
+            $ref: '#/definitions/account.Account'
         "401":
           description: Unauthorized
           schema:
@@ -169,7 +169,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_account.Account'
+            $ref: '#/definitions/account.Account'
         "403":
           description: Forbidden
           schema:
@@ -200,14 +200,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_account.amountRequest'
+          $ref: '#/definitions/account.amountRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_account.Account'
+            $ref: '#/definitions/account.Account'
         "400":
           description: Bad Request
           schema:
@@ -263,14 +263,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_account.amountRequest'
+          $ref: '#/definitions/account.amountRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_account.Account'
+            $ref: '#/definitions/account.Account'
         "400":
           description: Bad Request
           schema:
@@ -295,7 +295,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_account.Account'
+              $ref: '#/definitions/account.Account'
             type: array
         "403":
           description: Forbidden
@@ -322,14 +322,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_account.statusRequest'
+          $ref: '#/definitions/account.statusRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_account.Account'
+            $ref: '#/definitions/account.Account'
         "403":
           description: Forbidden
           schema:
@@ -407,7 +407,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_auth.loginRequest'
+          $ref: '#/definitions/auth.loginRequest'
       produces:
       - application/json
       responses:
@@ -434,14 +434,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_auth.registerRequest'
+          $ref: '#/definitions/auth.registerRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_auth.Customer'
+            $ref: '#/definitions/auth.Customer'
         "400":
           description: Bad Request
           schema:
@@ -467,7 +467,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_auth.tokenRequest'
+          $ref: '#/definitions/auth.tokenRequest'
       produces:
       - application/json
       responses:
@@ -553,14 +553,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_transfer.transferRequest'
+          $ref: '#/definitions/transfer.transferRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_transfer.Transfer'
+            $ref: '#/definitions/transfer.Transfer'
         "400":
           description: Bad Request
           schema:
@@ -595,7 +595,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_transfer.Transfer'
+            $ref: '#/definitions/transfer.Transfer'
         "403":
           description: Forbidden
           schema:
@@ -613,6 +613,8 @@ paths:
       - transfers
   /transfers/{id}/fail:
     patch:
+      description: PENDING→FAILED com estorno append-only. Repetir sobre FAILED é
+        no-op idempotente (200). Sobre SETTLED retorna 409 com error.code=FAIL_ON_SETTLED.
       parameters:
       - description: transfer id
         in: path
@@ -625,7 +627,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_transfer.Transfer'
+            $ref: '#/definitions/transfer.Transfer'
         "403":
           description: Forbidden
           schema:
@@ -637,7 +639,7 @@ paths:
             additionalProperties: true
             type: object
         "409":
-          description: Conflict
+          description: error.code=FAIL_ON_SETTLED
           schema:
             additionalProperties: true
             type: object
@@ -650,6 +652,8 @@ paths:
     patch:
       consumes:
       - application/json
+      description: PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200).
+        Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED.
       parameters:
       - description: transfer id
         in: path
@@ -660,14 +664,14 @@ paths:
         in: body
         name: body
         schema:
-          $ref: '#/definitions/internal_transfer.settleRequest'
+          $ref: '#/definitions/transfer.settleRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_transfer.Transfer'
+            $ref: '#/definitions/transfer.Transfer'
         "403":
           description: Forbidden
           schema:
@@ -679,7 +683,7 @@ paths:
             additionalProperties: true
             type: object
         "409":
-          description: Conflict
+          description: error.code=SETTLE_ON_FAILED
           schema:
             additionalProperties: true
             type: object

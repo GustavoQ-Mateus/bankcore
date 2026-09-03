@@ -27,7 +27,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "401": {
@@ -67,7 +67,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "403": {
@@ -118,7 +118,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_account.amountRequest"
+                            "$ref": "#/definitions/account.amountRequest"
                         }
                     }
                 ],
@@ -126,7 +126,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "400": {
@@ -217,7 +217,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_account.amountRequest"
+                            "$ref": "#/definitions/account.amountRequest"
                         }
                     }
                 ],
@@ -225,7 +225,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "400": {
@@ -265,7 +265,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_account.Account"
+                                "$ref": "#/definitions/account.Account"
                             }
                         }
                     },
@@ -310,7 +310,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_account.statusRequest"
+                            "$ref": "#/definitions/account.statusRequest"
                         }
                     }
                 ],
@@ -318,7 +318,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_account.Account"
+                            "$ref": "#/definitions/account.Account"
                         }
                     },
                     "403": {
@@ -437,7 +437,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.loginRequest"
+                            "$ref": "#/definitions/auth.loginRequest"
                         }
                     }
                 ],
@@ -478,7 +478,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.registerRequest"
+                            "$ref": "#/definitions/auth.registerRequest"
                         }
                     }
                 ],
@@ -486,7 +486,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.Customer"
+                            "$ref": "#/definitions/auth.Customer"
                         }
                     },
                     "400": {
@@ -526,7 +526,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.tokenRequest"
+                            "$ref": "#/definitions/auth.tokenRequest"
                         }
                     }
                 ],
@@ -664,7 +664,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.transferRequest"
+                            "$ref": "#/definitions/transfer.transferRequest"
                         }
                     }
                 ],
@@ -672,7 +672,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "400": {
@@ -726,7 +726,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "403": {
@@ -753,6 +753,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "PENDING→FAILED com estorno append-only. Repetir sobre FAILED é no-op idempotente (200). Sobre SETTLED retorna 409 com error.code=FAIL_ON_SETTLED.",
                 "produces": [
                     "application/json"
                 ],
@@ -773,7 +774,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "403": {
@@ -791,7 +792,7 @@
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "error.code=FAIL_ON_SETTLED",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -807,6 +808,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED.",
                 "consumes": [
                     "application/json"
                 ],
@@ -830,7 +832,7 @@
                         "name": "body",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.settleRequest"
+                            "$ref": "#/definitions/transfer.settleRequest"
                         }
                     }
                 ],
@@ -838,7 +840,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_transfer.Transfer"
+                            "$ref": "#/definitions/transfer.Transfer"
                         }
                     },
                     "403": {
@@ -856,7 +858,7 @@
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "error.code=SETTLE_ON_FAILED",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -867,7 +869,7 @@
         }
     },
     "definitions": {
-        "internal_account.Account": {
+        "account.Account": {
             "type": "object",
             "properties": {
                 "balance_cents": {
@@ -886,14 +888,14 @@
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/internal_account.Status"
+                    "$ref": "#/definitions/account.Status"
                 },
                 "version": {
                     "type": "integer"
                 }
             }
         },
-        "internal_account.Status": {
+        "account.Status": {
             "type": "string",
             "enum": [
                 "ACTIVE",
@@ -904,7 +906,7 @@
                 "StatusBlocked"
             ]
         },
-        "internal_account.amountRequest": {
+        "account.amountRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -912,15 +914,15 @@
                 }
             }
         },
-        "internal_account.statusRequest": {
+        "account.statusRequest": {
             "type": "object",
             "properties": {
                 "status": {
-                    "$ref": "#/definitions/internal_account.Status"
+                    "$ref": "#/definitions/account.Status"
                 }
             }
         },
-        "internal_auth.Customer": {
+        "auth.Customer": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -936,11 +938,11 @@
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/internal_auth.Role"
+                    "$ref": "#/definitions/auth.Role"
                 }
             }
         },
-        "internal_auth.Role": {
+        "auth.Role": {
             "type": "string",
             "enum": [
                 "CUSTOMER",
@@ -953,7 +955,7 @@
                 "RoleSettlement"
             ]
         },
-        "internal_auth.loginRequest": {
+        "auth.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -964,7 +966,7 @@
                 }
             }
         },
-        "internal_auth.registerRequest": {
+        "auth.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -977,11 +979,11 @@
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/internal_auth.Role"
+                    "$ref": "#/definitions/auth.Role"
                 }
             }
         },
-        "internal_auth.tokenRequest": {
+        "auth.tokenRequest": {
             "type": "object",
             "properties": {
                 "client_id": {
@@ -992,7 +994,7 @@
                 }
             }
         },
-        "internal_transfer.Status": {
+        "transfer.Status": {
             "type": "string",
             "enum": [
                 "PENDING",
@@ -1005,7 +1007,7 @@
                 "StatusFailed"
             ]
         },
-        "internal_transfer.Transfer": {
+        "transfer.Transfer": {
             "type": "object",
             "properties": {
                 "amount_cents": {
@@ -1027,14 +1029,14 @@
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/internal_transfer.Status"
+                    "$ref": "#/definitions/transfer.Status"
                 },
                 "to_account_id": {
                     "type": "string"
                 }
             }
         },
-        "internal_transfer.settleRequest": {
+        "transfer.settleRequest": {
             "type": "object",
             "properties": {
                 "settlement_ref": {
@@ -1042,7 +1044,7 @@
                 }
             }
         },
-        "internal_transfer.transferRequest": {
+        "transfer.transferRequest": {
             "type": "object",
             "properties": {
                 "amount": {
