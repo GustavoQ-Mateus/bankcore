@@ -369,7 +369,7 @@ func (s *Service) Settle(ctx context.Context, id uuid.UUID, ref string) (Transfe
 
 	switch current {
 	case StatusFailed:
-		return Transfer{}, httpx.ErrConflict("transferência falhou e não pode ser liquidada")
+		return Transfer{}, httpx.ErrSettleOnFailed
 	case StatusPending:
 		var refArg any
 		if ref != "" {
@@ -412,7 +412,7 @@ func (s *Service) Fail(ctx context.Context, id uuid.UUID) (Transfer, error) {
 
 	switch current {
 	case StatusSettled:
-		return Transfer{}, httpx.ErrConflict("transferência já liquidada e não pode falhar")
+		return Transfer{}, httpx.ErrFailOnSettled
 	case StatusPending:
 		if err := s.reverse(ctx, tx, id, from, to, amount); err != nil {
 			return Transfer{}, err

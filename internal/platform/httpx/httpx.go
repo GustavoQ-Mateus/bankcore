@@ -25,6 +25,9 @@ var (
 	ErrNotFound     = NewError(http.StatusNotFound, "NOT_FOUND", "recurso não encontrado")
 	ErrConflict     = func(msg string) *APIError { return NewError(http.StatusConflict, "CONFLICT", msg) }
 	ErrInternal     = NewError(http.StatusInternalServerError, "INTERNAL", "erro interno")
+
+	ErrSettleOnFailed = NewError(http.StatusConflict, "SETTLE_ON_FAILED", "transferência falhou e não pode ser liquidada")
+	ErrFailOnSettled  = NewError(http.StatusConflict, "FAIL_ON_SETTLED", "transferência já liquidada e não pode falhar")
 )
 
 func Decode(r *http.Request, dst any) error {

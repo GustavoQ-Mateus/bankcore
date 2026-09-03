@@ -2,8 +2,13 @@ package transfer_test
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
+
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
 )
 
@@ -191,7 +196,44 @@ func TestExternal_SettleThenFailConflict(t *testing.T) {
 	if _, err := svc.Settle(ctx, tr.ID, ""); err != nil {
 		t.Fatalf("settle: %v", err)
 	}
-	if _, err := svc.Fail(ctx, tr.ID); err == nil {
-		t.Fatal("esperava conflito ao falhar transferência já liquidada")
+	err = failErr(svc, ctx, tr.ID)
+	if code := conflictCode(t, err); code != "FAIL_ON_SETTLED" {
+		t.Fatalf("code = %q, quero FAIL_ON_SETTLED", code)
 	}
+}
+
+func TestExternal_FailThenSettleConflict(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool, transfer.WithExternalSettlement())
+	a, b := seedAccounts(t, pool, 10000)
+	ctx := context.Background()
+
+	tr, err := svc.Transfer(ctx, a, b, 3000, "ext-conflict-2")
+	if err != nil {
+		t.Fatalf("transfer: %v", err)
+	}
+	if _, err := svc.Fail(ctx, tr.ID); err != nil {
+		t.Fatalf("fail: %v", err)
+	}
+	_, err = svc.Settle(ctx, tr.ID, "")
+	if code := conflictCode(t, err); code != "SETTLE_ON_FAILED" {
+		t.Fatalf("code = %q, quero SETTLE_ON_FAILED", code)
+	}
+}
+
+func failErr(svc *transfer.Service, ctx context.Context, id uuid.UUID) error {
+	_, err := svc.Fail(ctx, id)
+	return err
+}
+
+func conflictCode(t *testing.T, err error) string {
+	t.Helper()
+	var apiErr *httpx.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("erro não é APIError: %v", err)
+	}
+	if apiErr.Status != http.StatusConflict {
+		t.Fatalf("status = %d, quero 409", apiErr.Status)
+	}
+	return apiErr.Code
 }

@@ -219,6 +219,7 @@ type settleRequest struct {
 
 // settle godoc
 // @Summary  Confirmar liquidação (SETTLEMENT)
+// @Description  PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED.
 // @Tags     settlement
 // @Accept   json
 // @Produce  json
@@ -228,7 +229,7 @@ type settleRequest struct {
 // @Success  200   {object}  Transfer
 // @Failure  403   {object}  map[string]any
 // @Failure  404   {object}  map[string]any
-// @Failure  409   {object}  map[string]any
+// @Failure  409   {object}  map[string]any  "error.code=SETTLE_ON_FAILED"
 // @Router   /transfers/{id}/settle [patch]
 func (h *Handler) settle(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -253,6 +254,7 @@ func (h *Handler) settle(w http.ResponseWriter, r *http.Request) {
 
 // fail godoc
 // @Summary  Falhar liquidação com estorno (SETTLEMENT)
+// @Description  PENDING→FAILED com estorno append-only. Repetir sobre FAILED é no-op idempotente (200). Sobre SETTLED retorna 409 com error.code=FAIL_ON_SETTLED.
 // @Tags     settlement
 // @Produce  json
 // @Security BearerAuth
@@ -260,7 +262,7 @@ func (h *Handler) settle(w http.ResponseWriter, r *http.Request) {
 // @Success  200  {object}  Transfer
 // @Failure  403  {object}  map[string]any
 // @Failure  404  {object}  map[string]any
-// @Failure  409  {object}  map[string]any
+// @Failure  409  {object}  map[string]any  "error.code=FAIL_ON_SETTLED"
 // @Router   /transfers/{id}/fail [patch]
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
