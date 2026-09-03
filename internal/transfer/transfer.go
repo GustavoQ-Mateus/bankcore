@@ -274,7 +274,7 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Transfer, error) {
 
 func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset int) ([]Transfer, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
+		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC, id ASC LIMIT $2 OFFSET $3`,
 		status, limit, offset,
 	)
 	if err != nil {
@@ -298,7 +298,7 @@ func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset
 
 func (s *Service) ListByStatusPaged(ctx context.Context, status Status, limit, offset int) ([]Transfer, bool, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
+		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC, id ASC LIMIT $2 OFFSET $3`,
 		status, limit+1, offset,
 	)
 	if err != nil {
@@ -330,7 +330,7 @@ func (s *Service) ListByStatusForOwner(ctx context.Context, status Status, owner
 		`SELECT `+transferCols+` FROM transfers t
 		 WHERE t.status = $1
 		   AND EXISTS (SELECT 1 FROM accounts a WHERE a.owner_id = $2 AND a.id IN (t.from_account_id, t.to_account_id))
-		 ORDER BY t.created_at ASC LIMIT $3 OFFSET $4`,
+		 ORDER BY t.created_at ASC, t.id ASC LIMIT $3 OFFSET $4`,
 		status, ownerID, limit, offset,
 	)
 	if err != nil {
