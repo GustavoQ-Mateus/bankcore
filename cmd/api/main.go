@@ -91,6 +91,10 @@ func run() error {
 		r.Route("/accounts", accountHandler.Routes)
 		r.Route("/transfers", transferHandler.Routes)
 		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireRole(auth.RoleSettlement))
+			r.Route("/settlement", transferHandler.SettlementRoutes)
+		})
+		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireRole(auth.RoleAdmin))
 			r.Route("/admin", func(r chi.Router) {
 				accountHandler.AdminRoutes(r)

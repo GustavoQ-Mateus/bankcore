@@ -149,6 +149,35 @@ func TestExternal_FailReverses(t *testing.T) {
 	}
 }
 
+func TestListByStatusPaged_HasNext(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool, transfer.WithExternalSettlement())
+	a, b := seedAccounts(t, pool, 1000000)
+	ctx := context.Background()
+
+	for _, key := range []string{"pg-0", "pg-1", "pg-2"} {
+		if _, err := svc.Transfer(ctx, a, b, 1000, key); err != nil {
+			t.Fatalf("transfer %s: %v", key, err)
+		}
+	}
+
+	first, hasNext, err := svc.ListByStatusPaged(ctx, transfer.StatusPending, 2, 0)
+	if err != nil {
+		t.Fatalf("page1: %v", err)
+	}
+	if len(first) != 2 || !hasNext {
+		t.Fatalf("page1 len=%d has_next=%v, quero 2/true", len(first), hasNext)
+	}
+
+	second, hasNext, err := svc.ListByStatusPaged(ctx, transfer.StatusPending, 2, 2)
+	if err != nil {
+		t.Fatalf("page2: %v", err)
+	}
+	if len(second) != 1 || hasNext {
+		t.Fatalf("page2 len=%d has_next=%v, quero 1/false", len(second), hasNext)
+	}
+}
+
 func TestExternal_SettleThenFailConflict(t *testing.T) {
 	pool := setupPool(t)
 	svc := transfer.NewService(pool, transfer.WithExternalSettlement())

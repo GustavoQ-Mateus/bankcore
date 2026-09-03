@@ -296,6 +296,35 @@ func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset
 	return transfers, nil
 }
 
+func (s *Service) ListByStatusPaged(ctx context.Context, status Status, limit, offset int) ([]Transfer, bool, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
+		status, limit+1, offset,
+	)
+	if err != nil {
+		return nil, false, httpx.ErrInternal
+	}
+	defer rows.Close()
+
+	transfers := make([]Transfer, 0, limit+1)
+	for rows.Next() {
+		var t Transfer
+		if err := scanTransfer(rows, &t); err != nil {
+			return nil, false, httpx.ErrInternal
+		}
+		transfers = append(transfers, t)
+	}
+	if rows.Err() != nil {
+		return nil, false, httpx.ErrInternal
+	}
+
+	hasNext := len(transfers) > limit
+	if hasNext {
+		transfers = transfers[:limit]
+	}
+	return transfers, hasNext, nil
+}
+
 func (s *Service) ListByStatusForOwner(ctx context.Context, status Status, ownerID uuid.UUID, limit, offset int) ([]Transfer, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT `+transferCols+` FROM transfers t

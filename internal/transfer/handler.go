@@ -36,6 +36,10 @@ func (h *Handler) AdminRoutes(r chi.Router) {
 	r.Get("/transfers", h.adminList)
 }
 
+func (h *Handler) SettlementRoutes(r chi.Router) {
+	r.Get("/transfers", h.settlementList)
+}
+
 type transferRequest struct {
 	From   string `json:"from"`
 	To     string `json:"to"`
@@ -144,6 +148,37 @@ func (h *Handler) adminList(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"page":      page,
+		"status":    status,
+		"transfers": transfers,
+	})
+}
+
+// settlementList godoc
+// @Summary  Listar transferências por status (SETTLEMENT)
+// @Tags     settlement
+// @Produce  json
+// @Security BearerAuth
+// @Param    status  query     string  true   "PENDING, SETTLED ou FAILED"
+// @Param    page    query     int     false  "página"
+// @Success  200     {object}  map[string]any
+// @Failure  403     {object}  map[string]any
+// @Router   /settlement/transfers [get]
+func (h *Handler) settlementList(w http.ResponseWriter, r *http.Request) {
+	status := Status(r.URL.Query().Get("status"))
+	if status != StatusPending && status != StatusSettled && status != StatusFailed {
+		httpx.Error(w, httpx.ErrValidation("status deve ser PENDING, SETTLED ou FAILED"))
+		return
+	}
+	page := pageParam(r)
+	transfers, hasNext, err := h.svc.ListByStatusPaged(r.Context(), status, pageSize, (page-1)*pageSize)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"page":      page,
+		"page_size": pageSize,
+		"has_next":  hasNext,
 		"status":    status,
 		"transfers": transfers,
 	})
