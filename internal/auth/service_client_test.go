@@ -94,9 +94,12 @@ func TestServiceToken_IssueAndAccess(t *testing.T) {
 		t.Errorf("role = %s, quero SETTLEMENT", sc.Role)
 	}
 
-	token, err := svc.IssueServiceToken(ctx, sc.ClientID, secret)
+	token, expiresIn, err := svc.IssueServiceToken(ctx, sc.ClientID, secret)
 	if err != nil {
 		t.Fatalf("emitir token: %v", err)
+	}
+	if expiresIn <= 0 {
+		t.Errorf("expires_in = %d, quero > 0", expiresIn)
 	}
 
 	srv := protectedServer(svc)
@@ -115,10 +118,10 @@ func TestServiceToken_WrongSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("provisionar: %v", err)
 	}
-	if _, err := svc.IssueServiceToken(ctx, sc.ClientID, "secret-errado"); err == nil {
+	if _, _, err := svc.IssueServiceToken(ctx, sc.ClientID, "secret-errado"); err == nil {
 		t.Fatal("esperava erro com secret inválido")
 	}
-	if _, err := svc.IssueServiceToken(ctx, "svc_inexistente", "x"); err == nil {
+	if _, _, err := svc.IssueServiceToken(ctx, "svc_inexistente", "x"); err == nil {
 		t.Fatal("esperava erro com client_id inexistente")
 	}
 }

@@ -130,7 +130,7 @@ func (h *Handler) token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.svc.IssueServiceToken(r.Context(), req.ClientID, req.ClientSecret)
+	token, expiresIn, err := h.svc.IssueServiceToken(r.Context(), req.ClientID, req.ClientSecret)
 	if err != nil {
 		httpx.Error(w, err)
 		return
@@ -138,6 +138,7 @@ func (h *Handler) token(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"token":      token,
 		"token_type": "Bearer",
+		"expires_in": expiresIn,
 	})
 }
 

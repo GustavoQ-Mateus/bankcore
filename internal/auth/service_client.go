@@ -54,7 +54,7 @@ func (s *Service) CreateServiceClient(ctx context.Context) (ServiceClient, strin
 	return sc, secret, nil
 }
 
-func (s *Service) IssueServiceToken(ctx context.Context, clientID, clientSecret string) (string, error) {
+func (s *Service) IssueServiceToken(ctx context.Context, clientID, clientSecret string) (string, int, error) {
 	var (
 		id         uuid.UUID
 		secretHash string
@@ -65,13 +65,13 @@ func (s *Service) IssueServiceToken(ctx context.Context, clientID, clientSecret 
 	).Scan(&id, &secretHash, &role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", httpx.ErrUnauthorized
+			return "", 0, httpx.ErrUnauthorized
 		}
-		return "", httpx.ErrInternal
+		return "", 0, httpx.ErrInternal
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(secretHash), []byte(clientSecret)); err != nil {
-		return "", httpx.ErrUnauthorized
+		return "", 0, httpx.ErrUnauthorized
 	}
 
 	now := time.Now()
@@ -86,9 +86,9 @@ func (s *Service) IssueServiceToken(ctx context.Context, clientID, clientSecret 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(s.jwtSecret)
 	if err != nil {
-		return "", httpx.ErrInternal
+		return "", 0, httpx.ErrInternal
 	}
-	return signed, nil
+	return signed, int(s.serviceTTL.Seconds()), nil
 }
 
 func randomToken(prefix string) (string, error) {
