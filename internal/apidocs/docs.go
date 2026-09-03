@@ -554,6 +554,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/settlement/transfers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settlement"
+                ],
+                "summary": "Listar transferências por status (SETTLEMENT)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "PENDING, SETTLED ou FAILED",
+                        "name": "status",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "página",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/transfers": {
             "get": {
                 "security": [

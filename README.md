@@ -79,6 +79,7 @@ Health check: `curl localhost:8080/health`.
 | POST | `/transfers` (header `Idempotency-Key`) | dono/admin |
 | GET | `/transfers?status=` | dono |
 | GET | `/transfers/{id}` | participante/admin |
+| GET | `/settlement/transfers?status=` | settlement |
 | PATCH | `/transfers/{id}/settle` | settlement |
 | PATCH | `/transfers/{id}/fail` | settlement |
 | GET | `/admin/accounts` | admin |
@@ -91,7 +92,9 @@ Health check: `curl localhost:8080/health`.
 Valores monetários entram/saem em decimal (`"100.50"`) e são operados internamente em centavos `int64`.
 
 ### Fronteira de liquidação com o Liquida (v1.1.0)
-Com `LIQUIDA_INTEGRATION=external`, `POST /transfers` move o dinheiro atomicamente mas deixa a transferência `PENDING`; o Liquida autentica via client-credentials (`POST /auth/token` → JWT `SETTLEMENT` com TTL curto), lê pendências (`GET /transfers?status=PENDING`) e confirma com `PATCH /transfers/{id}/settle` ou estorna com `/fail`. Padrão é `standalone` (auto-liquidante, = v1.0.0). Ver `docs/specs/spec-v1.1.0.md` e ADR 0004.
+Com `LIQUIDA_INTEGRATION=external`, `POST /transfers` move o dinheiro atomicamente mas deixa a transferência `PENDING`; o Liquida autentica via client-credentials (`POST /auth/token` → JWT `SETTLEMENT` com TTL curto), lê o backlog em `GET /settlement/transfers?status=PENDING` (role SETTLEMENT, least-privilege, paginação offset `page`/`page_size` 50 + `has_next`) e confirma com `PATCH /transfers/{id}/settle` ou estorna com `/fail`. Padrão é `standalone` (auto-liquidante, = v1.0.0). Ver `docs/specs/spec-v1.1.0.md` e ADR 0004.
+
+`docker compose up -d --build` sobe Postgres + migrations + API na rede `bankcore-net`, alcançável por outros serviços em `http://bankcore-api:8080` (host `:8081`). O Liquida anexa a mesma rede declarando-a `external`.
 
 ### Documentação interativa (Swagger)
 A API expõe **Swagger UI** em `http://localhost:8080/swagger/index.html` e o spec em `/swagger/doc.json`, gerados via **swaggo** a partir das anotações nos handlers. Regenerar após alterar rotas:

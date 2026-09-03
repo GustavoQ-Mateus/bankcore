@@ -23,7 +23,7 @@ Permitir que o Liquida (a) descubra as transferências pendentes de liquidação
 
 ## 3. Escopo (incremento 1.1.0)
 1. **Modo de liquidação configurável** (`LIQUIDA_INTEGRATION`): `standalone` (padrão, = v1.0.0) ou `external` (Liquida liquida).
-2. **Descoberta de pendências**: `GET /transfers?status=PENDING` para o cliente (participante) e `GET /admin/transfers?status=` para operação (este último já entregue na Fase 3 da v1.0.0).
+2. **Descoberta de pendências**: `GET /settlement/transfers?status=PENDING` para o Liquida (role SETTLEMENT, least-privilege), `GET /transfers?status=PENDING` para o cliente (participante) e `GET /admin/transfers?status=` para operação.
 3. **Confirmação de liquidação**: `PATCH /transfers/{id}/settle`, chamado pelo Liquida, transição `PENDING → SETTLED`, idempotente.
 4. **Falha de liquidação**: `PATCH /transfers/{id}/fail`, transição `PENDING → FAILED` com estorno compensatório no ledger (ver §7).
 5. **Credencial de serviço (M2M)** para o Liquida: fluxo **client-credentials** (`POST /auth/token`) que emite JWT `role=SETTLEMENT` com **TTL curto**, distinto de `CUSTOMER`/`ADMIN`. Sem token estático/eterno (ver ADR 0004).
@@ -47,6 +47,7 @@ service_clients (id uuid, client_id text UNIQUE, secret_hash text, role, created
 ## 6. Endpoints (delta)
 - `POST /admin/service-clients` — **role `ADMIN`** — provisiona a credencial do Liquida. Retorna `client_id` + `client_secret` **uma única vez** (o servidor só guarda o hash).
 - `POST /auth/token` — **client-credentials grant**. Body `{ "client_id", "client_secret" }` → JWT `role=SETTLEMENT` com **TTL curto** (`SERVICE_JWT_TTL`, default 15m). Pública (autentica pela própria credencial), mas só emite token se o par bater com o hash.
+- `GET /settlement/transfers?status=PENDING&page=` — **role `SETTLEMENT`** — backlog de liquidação para o Liquida (least-privilege, sem ADMIN). Paginação offset (`page`, `page_size` fixo 50) e `has_next` na resposta. Mesmo schema de `Transfer`.
 - `GET /transfers?status=PENDING&page=` — participante lista suas transferências pendentes (novo, cliente).
 - `PATCH /transfers/{id}/settle` — **role `SETTLEMENT`** — confirma liquidação. Body opcional `{ "settlement_ref": "..." }`. Header `Idempotency-Key` recomendado.
 - `PATCH /transfers/{id}/fail` — **role `SETTLEMENT`** — marca falha de liquidação e dispara estorno compensatório.
@@ -82,9 +83,10 @@ service_clients (id uuid, client_id text UNIQUE, secret_hash text, role, created
 3. **Auth M2M**: role `SETTLEMENT`, provisionamento `POST /admin/service-clients` (secret gerado, hash persistido) e `POST /auth/token` (client-credentials, TTL curto).
 4. **POST em modo external**: parar de auto-marcar `SETTLED`; deixar `PENDING` após o commit do movimento.
 5. **Endpoints** `PATCH /settle` e `/fail` protegidos por `RequireRole(SETTLEMENT)`.
-6. **`GET /transfers?status=PENDING`** para o cliente (filtrado pelos participantes).
-7. **Testes testcontainers** para CA6–CA10, incluindo emissão/expiração do token de serviço, idempotência do settle e o estorno do fail.
+6. **`GET /transfers?status=PENDING`** para o cliente e **`GET /settlement/transfers?status=`** para a role SETTLEMENT (com `has_next`).
+7. **Testes testcontainers** para CA6–CA10, incluindo emissão/expiração do token de serviço, idempotência do settle, estorno do fail e paginação `has_next`.
 8. **Swagger** regenerado e README/diagrama atualizados com o fluxo de liquidação.
+9. **Orquestração**: `docker-compose` único (Postgres + migrations + `bankcore-api`) na rede `bankcore-net`, alcançável em `http://bankcore-api:8080`; host `:8081` para não colidir com o Liquida. O Liquida anexa a rede como `external`.
 
 ## 12. Referências
 - ADR 0004 — Fronteira de liquidação com o Liquida (novo nesta versão).

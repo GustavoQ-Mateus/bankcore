@@ -26,6 +26,7 @@ A credencial do Liquida é **JWT com role `SETTLEMENT`**, emitido por um fluxo *
 - **Reaproveitamento do RBAC**: `SETTLEMENT` é só mais uma claim de role; `RequireRole(SETTLEMENT)` é o mesmo middleware do RBAC de usuário. Nenhum segundo mecanismo de auth para construir, testar, revogar e auditar em paralelo.
 - **Provisionamento**: `POST /admin/service-clients` (role `ADMIN`) gera o `client_secret` no servidor, exibe **uma única vez** e persiste apenas o hash. Rotação/revogação por linha em `service_clients`, sem redeploy. O Liquida guarda o secret no seu próprio secret store — **nunca no código**.
 - **Idempotência ortogonal ao auth**: a `Idempotency-Key`/`transfer_id` = `transacao_id` do Liquida (ADR 0003) segue como chave ponta a ponta, independente do mecanismo de token.
+- **Leitura least-privilege do backlog**: em vez de conceder `ADMIN` ao Liquida (que abriria listagem de contas, bloqueio etc.), a role SETTLEMENT ganha um endpoint próprio `GET /settlement/transfers?status=` — mesmo schema e paginação do `/admin/transfers`, escopo restrito. Mantém o princípio de menor privilégio: SETTLEMENT só lê o backlog e chama `settle`/`fail`.
 
 ## Alternativas consideradas
 - **Autorização em duas fases (POST só reserva, dinheiro move no settle)**: rejeitada — quebraria a semântica de atomicidade da v1.0.0, exigiria estado de "reserva" e seria um MAJOR.

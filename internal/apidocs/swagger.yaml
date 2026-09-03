@@ -484,6 +484,36 @@ paths:
       summary: Token de serviço (client-credentials)
       tags:
       - auth
+  /settlement/transfers:
+    get:
+      parameters:
+      - description: PENDING, SETTLED ou FAILED
+        in: query
+        name: status
+        required: true
+        type: string
+      - description: página
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Listar transferências por status (SETTLEMENT)
+      tags:
+      - settlement
   /transfers:
     get:
       parameters:
