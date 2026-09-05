@@ -99,5 +99,6 @@ service_clients (id uuid, client_id text UNIQUE, secret_hash text, role, created
 ---
 
 ## Changelog
+- **1.1.0 (2026-09-05, reconciliação)** — Cruzados os handoffs BankCore↔Liquida. Correção de contrato: `settled_at`/`settlement_ref` deixam de usar `omitempty` e serializam como `null` no `PENDING` (chaves sempre presentes), batendo com a spec v2.0.0 §4.2 do Liquida. Decisões registradas: (a) `register` público com `role=ADMIN` será fechado na 1.2.0 (gate por env + seed do 1º admin), mantido aberto só no ambiente de E2E; (b) o Liquida não aciona `/fail` no fluxo automático (DLQ/reconciliação manual); (c) reconciliação de pendências órfãs fica para a 1.2.0. Swagger regenerado.
 - **1.1.0 (2026-09-02)** — Fronteira de liquidação com o Liquida: modo `standalone`/`external` configurável, `PATCH /transfers/{id}/settle` e `/fail` (role `SETTLEMENT`), `GET /transfers?status=PENDING`, colunas `settled_at`/`settlement_ref`, idempotência ponta a ponta e estorno append-only no fail. Compatível com a v1.0.0 (standalone é o padrão). Ver ADR 0004.
 - **1.0.0 (2026-08-31)** — Primeira spec. Núcleo bancário em Go: auth JWT, contas, depósito/saque, transferência atômica com optimistic locking, ledger append-only, idempotência, modelo de dados em centavos int64 e critérios de aceitação.
