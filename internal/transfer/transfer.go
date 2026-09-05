@@ -30,8 +30,8 @@ type Transfer struct {
 	ToAccountID   uuid.UUID  `json:"to_account_id"`
 	AmountCents   int64      `json:"amount_cents"`
 	Status        Status     `json:"status"`
-	SettledAt     *time.Time `json:"settled_at,omitempty"`
-	SettlementRef *string    `json:"settlement_ref,omitempty"`
+	SettledAt     *time.Time `json:"settled_at"`
+	SettlementRef *string    `json:"settlement_ref"`
 	CreatedAt     time.Time  `json:"created_at"`
 }
 
