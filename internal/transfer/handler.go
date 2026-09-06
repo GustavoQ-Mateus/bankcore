@@ -238,11 +238,9 @@ func (h *Handler) settle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req settleRequest
-	if r.ContentLength > 0 {
-		if err := httpx.Decode(r, &req); err != nil {
-			httpx.Error(w, err)
-			return
-		}
+	if err := httpx.DecodeOptional(r, &req); err != nil {
+		httpx.Error(w, err)
+		return
 	}
 	t, err := h.svc.Settle(r.Context(), id, req.SettlementRef)
 	if err != nil {
