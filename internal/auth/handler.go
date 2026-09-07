@@ -52,6 +52,7 @@ type tokenRequest struct {
 // @Param    body  body      registerRequest  true  "dados do cliente"
 // @Success  201   {object}  Customer
 // @Failure  400   {object}  map[string]any
+// @Failure  403   {object}  map[string]any
 // @Failure  409   {object}  map[string]any
 // @Router   /auth/register [post]
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {

@@ -52,9 +52,9 @@ sequenceDiagram
 Go 1.22+ · chi · pgx + PostgreSQL · golang-migrate · JWT · testcontainers-go · Docker · Makefile · GitHub Actions · Swagger (swaggo).
 
 ## Documentação (spec-driven)
-- **Spec (versionada):** [`docs/specs/spec-v1.0.0.md`](docs/specs/spec-v1.0.0.md)
+- **Spec (versionada):** [`v1.0.0`](docs/specs/spec-v1.0.0.md) · [`v1.1.0`](docs/specs/spec-v1.1.0.md) · [`v1.2.0`](docs/specs/spec-v1.2.0.md)
 - **PRD:** [`docs/PRD_BankCore_Go.md`](docs/PRD_BankCore_Go.md)
-- **ADRs:** [0001 optimistic locking](docs/adr/0001-optimistic-locking.md) · [0002 dinheiro int64](docs/adr/0002-dinheiro-int64-centavos.md) · [0003 idempotência](docs/adr/0003-idempotencia-transferencias.md)
+- **ADRs:** [0001 optimistic locking](docs/adr/0001-optimistic-locking.md) · [0002 dinheiro int64](docs/adr/0002-dinheiro-int64-centavos.md) · [0003 idempotência](docs/adr/0003-idempotencia-transferencias.md) · [0004 fronteira de liquidação](docs/adr/0004-fronteira-liquidacao-liquida.md)
 
 ## Como rodar
 ```bash
@@ -95,6 +95,17 @@ Valores monetários entram/saem em decimal (`"100.50"`) e são operados internam
 Com `LIQUIDA_INTEGRATION=external`, `POST /transfers` move o dinheiro atomicamente mas deixa a transferência `PENDING`; o Liquida autentica via client-credentials (`POST /auth/token` → JWT `SETTLEMENT` com TTL curto), lê o backlog em `GET /settlement/transfers?status=PENDING` (role SETTLEMENT, least-privilege, paginação offset `page`/`page_size` 50 + `has_next`) e confirma com `PATCH /transfers/{id}/settle` ou estorna com `/fail`. Padrão é `standalone` (auto-liquidante, = v1.0.0). Ver `docs/specs/spec-v1.1.0.md` e ADR 0004.
 
 `docker compose up -d --build` sobe Postgres + migrations + API na rede `bankcore-net`, alcançável por outros serviços em `http://bankcore-api:8080` (host `:8081`). O Liquida anexa a mesma rede declarando-a `external`.
+
+### Cadastro de administrador (v1.2.0)
+Por padrão o `POST /auth/register` é **seguro**: só cria `CUSTOMER`. Pedido de `role` privilegiada é recusado com `403 ADMIN_REGISTER_DISABLED`.
+
+| Variável | Default | Efeito |
+|---|---|---|
+| `ALLOW_PUBLIC_ADMIN_REGISTER` | `false` | `true` reabre o `register` para aceitar `role` no corpo (uso em E2E/dev). |
+| `ADMIN_EMAIL` | — | Com `ADMIN_PASSWORD`, semeia um `ADMIN` no boot (idempotente). |
+| `ADMIN_PASSWORD` | — | Senha do admin semeado (nunca logada). |
+
+Recomendado: manter o gate fechado e criar o 1º admin por seed (`ADMIN_EMAIL`/`ADMIN_PASSWORD`). Ver `docs/specs/spec-v1.2.0.md`.
 
 ### Documentação interativa (Swagger)
 A API expõe **Swagger UI** em `http://localhost:8080/swagger/index.html` e o spec em `/swagger/doc.json`, gerados via **swaggo** a partir das anotações nos handlers. Regenerar após alterar rotas:

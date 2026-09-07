@@ -32,26 +32,36 @@ type Customer struct {
 }
 
 type Service struct {
-	pool       *pgxpool.Pool
-	jwtSecret  []byte
-	jwtTTL     time.Duration
-	serviceTTL time.Duration
-	bcryptCost int
+	pool                     *pgxpool.Pool
+	jwtSecret                []byte
+	jwtTTL                   time.Duration
+	serviceTTL               time.Duration
+	bcryptCost               int
+	allowPublicAdminRegister bool
 }
 
-func NewService(pool *pgxpool.Pool, jwtSecret string, jwtTTL, serviceTTL time.Duration, bcryptCost int) *Service {
+func NewService(pool *pgxpool.Pool, jwtSecret string, jwtTTL, serviceTTL time.Duration, bcryptCost int, allowPublicAdminRegister bool) *Service {
 	return &Service{
-		pool:       pool,
-		jwtSecret:  []byte(jwtSecret),
-		jwtTTL:     jwtTTL,
-		serviceTTL: serviceTTL,
-		bcryptCost: bcryptCost,
+		pool:                     pool,
+		jwtSecret:                []byte(jwtSecret),
+		jwtTTL:                   jwtTTL,
+		serviceTTL:               serviceTTL,
+		bcryptCost:               bcryptCost,
+		allowPublicAdminRegister: allowPublicAdminRegister,
 	}
 }
 
 func (s *Service) Register(ctx context.Context, name, email, password string, role Role) (Customer, error) {
-	if role != RoleCustomer && role != RoleAdmin {
+	if role == "" {
 		role = RoleCustomer
+	}
+	if role != RoleCustomer {
+		if !s.allowPublicAdminRegister {
+			return Customer{}, httpx.ErrAdminRegisterDisabled
+		}
+		if role != RoleAdmin {
+			role = RoleCustomer
+		}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
@@ -97,4 +107,33 @@ func (s *Service) Login(ctx context.Context, email, password string) (string, Cu
 		return "", Customer{}, httpx.ErrInternal
 	}
 	return token, c, nil
+}
+
+func (s *Service) EnsureAdmin(ctx context.Context, name, email, password string) (bool, error) {
+	var exists bool
+	if err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM customers WHERE email = $1)`, email,
+	).Scan(&exists); err != nil {
+		return false, err
+	}
+	if exists {
+		return false, nil
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = s.pool.Exec(ctx,
+		`INSERT INTO customers (name, email, password_hash, role) VALUES ($1, $2, $3, $4)`,
+		name, email, string(hash), RoleAdmin,
+	)
+	if err != nil {
+		if database.IsUniqueViolation(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

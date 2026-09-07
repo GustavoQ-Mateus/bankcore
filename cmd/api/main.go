@@ -25,8 +25,8 @@ import (
 )
 
 // @title           BankCore API
-// @version         1.1.0
-// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004).
+// @version         1.2.0
+// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004); v1.2.0 fecha o cadastro público de administrador (gate ALLOW_PUBLIC_ADMIN_REGISTER + seed do 1º admin).
 // @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey  BearerAuth
@@ -52,8 +52,18 @@ func run() error {
 	}
 	defer pool.Close()
 
-	authSvc := auth.NewService(pool, cfg.JWTSecret, cfg.JWTTTL, cfg.ServiceJWTTTL, cfg.BcryptCost)
+	authSvc := auth.NewService(pool, cfg.JWTSecret, cfg.JWTTTL, cfg.ServiceJWTTTL, cfg.BcryptCost, cfg.AllowPublicAdminRegister)
 	accountSvc := account.NewService(pool)
+
+	if cfg.AdminEmail != "" && cfg.AdminPassword != "" {
+		created, err := authSvc.EnsureAdmin(ctx, "Administrador", cfg.AdminEmail, cfg.AdminPassword)
+		if err != nil {
+			return err
+		}
+		if created {
+			log.Printf("admin semeado: %s", cfg.AdminEmail)
+		}
+	}
 
 	var transferOpts []transfer.Option
 	if cfg.LiquidaExternal {

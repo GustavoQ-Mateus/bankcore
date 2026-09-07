@@ -18,6 +18,10 @@ import (
 )
 
 func setupAuth(t *testing.T) (*auth.Service, *pgxpool.Pool) {
+	return setupAuthWithGate(t, false)
+}
+
+func setupAuthWithGate(t *testing.T, allowPublicAdminRegister bool) (*auth.Service, *pgxpool.Pool) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -54,7 +58,7 @@ func setupAuth(t *testing.T) (*auth.Service, *pgxpool.Pool) {
 		}
 	}
 
-	return auth.NewService(pool, "test-secret", time.Hour, 15*time.Minute, 4), pool
+	return auth.NewService(pool, "test-secret", time.Hour, 15*time.Minute, 4, allowPublicAdminRegister), pool
 }
 
 func protectedServer(svc *auth.Service) *httptest.Server {

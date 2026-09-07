@@ -8,13 +8,16 @@ import (
 )
 
 type Config struct {
-	HTTPAddr        string
-	DatabaseURL     string
-	JWTSecret       string
-	JWTTTL          time.Duration
-	ServiceJWTTTL   time.Duration
-	BcryptCost      int
-	LiquidaExternal bool
+	HTTPAddr                 string
+	DatabaseURL              string
+	JWTSecret                string
+	JWTTTL                   time.Duration
+	ServiceJWTTTL            time.Duration
+	BcryptCost               int
+	LiquidaExternal          bool
+	AllowPublicAdminRegister bool
+	AdminEmail               string
+	AdminPassword            string
 }
 
 func Load() (Config, error) {
@@ -51,6 +54,15 @@ func Load() (Config, error) {
 	default:
 		return Config{}, fmt.Errorf("LIQUIDA_INTEGRATION inválido: %q (use standalone ou external)", mode)
 	}
+
+	allowAdmin, err := strconv.ParseBool(getenv("ALLOW_PUBLIC_ADMIN_REGISTER", "false"))
+	if err != nil {
+		return Config{}, fmt.Errorf("ALLOW_PUBLIC_ADMIN_REGISTER inválido: %w", err)
+	}
+	cfg.AllowPublicAdminRegister = allowAdmin
+
+	cfg.AdminEmail = os.Getenv("ADMIN_EMAIL")
+	cfg.AdminPassword = os.Getenv("ADMIN_PASSWORD")
 
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "dev-insecure-secret-change-me"

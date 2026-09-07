@@ -29,6 +29,8 @@ var (
 
 	ErrSettleOnFailed = NewError(http.StatusConflict, "SETTLE_ON_FAILED", "transferência falhou e não pode ser liquidada")
 	ErrFailOnSettled  = NewError(http.StatusConflict, "FAIL_ON_SETTLED", "transferência já liquidada e não pode falhar")
+
+	ErrAdminRegisterDisabled = NewError(http.StatusForbidden, "ADMIN_REGISTER_DISABLED", "cadastro público com role privilegiada está desabilitado")
 )
 
 func Decode(r *http.Request, dst any) error {
