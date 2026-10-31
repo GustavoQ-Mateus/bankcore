@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,8 +37,9 @@ type Transfer struct {
 }
 
 type Service struct {
-	pool     *pgxpool.Pool
-	external bool
+	pool             *pgxpool.Pool
+	external         bool
+	versionConflicts atomic.Int64
 }
 
 type Option func(*Service)
@@ -55,6 +57,10 @@ func NewService(pool *pgxpool.Pool, opts ...Option) *Service {
 }
 
 var errVersionConflict = errors.New("version conflict")
+
+func (s *Service) VersionConflicts() int64 {
+	return s.versionConflicts.Load()
+}
 
 func (s *Service) Transfer(ctx context.Context, from, to uuid.UUID, amount int64, key string) (Transfer, error) {
 	if key == "" {
@@ -121,6 +127,7 @@ func (s *Service) process(ctx context.Context, t Transfer) (Transfer, error) {
 			return t, nil
 		}
 		if errors.Is(err, errVersionConflict) {
+			s.versionConflicts.Add(1)
 			continue
 		}
 		var apiErr *httpx.APIError

@@ -234,3 +234,42 @@ func transferWithClientRetry(svc *transfer.Service, from, to uuid.UUID, amount i
 	}
 	return false
 }
+
+func TestTransfer_ConcurrentCountsVersionConflicts(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool)
+	a, b := seedAccounts(t, pool, 1000000)
+
+	const n = 20
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			transferWithClientRetry(svc, a, b, 100, uuid.NewString())
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if got := svc.VersionConflicts(); got == 0 {
+		t.Error("version_conflicts = 0, quero > 0 com transferências concorrentes nas mesmas contas")
+	}
+}
+
+func TestTransfer_SequentialHasNoVersionConflicts(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool)
+	a, b := seedAccounts(t, pool, 10000)
+
+	for i := 0; i < 3; i++ {
+		if _, err := svc.Transfer(context.Background(), a, b, 100, uuid.NewString()); err != nil {
+			t.Fatalf("transfer: %v", err)
+		}
+	}
+	if got := svc.VersionConflicts(); got != 0 {
+		t.Errorf("version_conflicts = %d, quero 0 sem concorrência", got)
+	}
+}
