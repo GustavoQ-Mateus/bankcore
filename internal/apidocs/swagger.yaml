@@ -254,9 +254,10 @@ info:
     em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR
     0004); v1.2.0 fecha o cadastro público de administrador (gate ALLOW_PUBLIC_ADMIN_REGISTER
     + seed do 1º admin); v1.3.0 adiciona o simulador de carga e as estatísticas do
-    dashboard (SIMULATION_ENABLED, ADR 0005).'
+    dashboard (SIMULATION_ENABLED, ADR 0005); v1.4.0 adiciona a limpeza do ambiente
+    de simulação (ADR 0006).'
   title: BankCore API
-  version: 1.3.0
+  version: 1.4.0
 paths:
   /accounts:
     post:
@@ -643,6 +644,32 @@ paths:
       summary: Listar transferências por status (SETTLEMENT)
       tags:
       - settlement
+  /simulation/reset:
+    post:
+      description: Apaga todos os lançamentos, transferências e contas numa transação
+        (exceção de demonstração ao ledger append-only, ADR 0006). Mantém customers
+        e service_clients. Zera version_conflicts e o estado do simulador. Execução
+        ativa retorna 409 com error.code=SIMULATION_RUNNING.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_simulation.Status'
+        "409":
+          description: error.code=SIMULATION_RUNNING
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Limpar ambiente de simulação
+      tags:
+      - simulation
   /simulation/start:
     post:
       consumes:
