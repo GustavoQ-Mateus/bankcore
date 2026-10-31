@@ -366,6 +366,13 @@ func TestStats_KnownDataAndDivergenceDetection(t *testing.T) {
 	); err != nil {
 		t.Fatalf("inserir órfã: %v", err)
 	}
+	if _, err := f.pool.Exec(ctx,
+		`UPDATE transfers SET
+		     created_at = CASE WHEN idempotency_key = 'k-failed' THEN now() - interval '10 seconds' ELSE now() - interval '300 milliseconds' END,
+		     settled_at = CASE WHEN settled_at IS NULL THEN NULL ELSE now() - interval '100 milliseconds' END`,
+	); err != nil {
+		t.Fatalf("fixar horários: %v", err)
+	}
 
 	s := stats(t, f.reporter)
 	if s.Transfers != (simulation.TransferCounts{Pending: 1, Settled: 1, Failed: 1}) {
@@ -374,11 +381,11 @@ func TestStats_KnownDataAndDivergenceDetection(t *testing.T) {
 	if s.VolumeCents != (simulation.Volume{Pending: 2500, Settled: 1000}) {
 		t.Errorf("volume_cents = %+v, quero pending 2500 settled 1000", s.VolumeCents)
 	}
-	if s.Throughput.CreatedPerSec < 1 || s.Throughput.SettledPerSec < 1 {
-		t.Errorf("throughput = %+v, quero >= 1 nas janelas de 1s", s.Throughput)
+	if s.Throughput != (simulation.Throughput{CreatedPerSec: 3, SettledPerSec: 1}) {
+		t.Errorf("throughput = %+v, quero 3 criadas e 1 liquidada na janela de 1s", s.Throughput)
 	}
-	if s.SettlementLatencyMS.P50 <= 0 || s.SettlementLatencyMS.P95 < s.SettlementLatencyMS.P50 {
-		t.Errorf("latência = %+v, quero p50 > 0 e p95 >= p50", s.SettlementLatencyMS)
+	if s.SettlementLatencyMS != (simulation.Latency{P50: 200, P95: 200}) {
+		t.Errorf("latência = %+v, quero p50 e p95 de 200ms", s.SettlementLatencyMS)
 	}
 	if s.Ledger != (simulation.Ledger{Accounts: 3, DivergentAccounts: 0}) {
 		t.Errorf("ledger = %+v, quero 3 contas e 0 divergentes", s.Ledger)
