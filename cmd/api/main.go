@@ -65,6 +65,16 @@ func run() error {
 		}
 	}
 
+	if cfg.SettlementClientID != "" && cfg.SettlementClientSecret != "" {
+		created, err := authSvc.EnsureServiceClient(ctx, cfg.SettlementClientID, cfg.SettlementClientSecret)
+		if err != nil {
+			return err
+		}
+		if created {
+			log.Printf("credencial de liquidação semeada: %s", cfg.SettlementClientID)
+		}
+	}
+
 	var transferOpts []transfer.Option
 	if cfg.LiquidaExternal {
 		transferOpts = append(transferOpts, transfer.WithExternalSettlement())
