@@ -32,6 +32,8 @@ var (
 	ErrTransferNotBooked = NewError(http.StatusConflict, "TRANSFER_NOT_BOOKED", "transferência ainda sem movimento e não pode ser liquidada")
 
 	ErrAdminRegisterDisabled = NewError(http.StatusForbidden, "ADMIN_REGISTER_DISABLED", "cadastro público com role privilegiada está desabilitado")
+
+	ErrSimulationRunning = NewError(http.StatusConflict, "SIMULATION_RUNNING", "já existe uma simulação em execução")
 )
 
 func Decode(r *http.Request, dst any) error {
