@@ -143,3 +143,21 @@ func TestCORS_SimpleRequestFromDashboardAllowsOrigin(t *testing.T) {
 		t.Errorf("Access-Control-Allow-Origin = %q, quero %q", got, dashboardOrigin)
 	}
 }
+
+func TestCORS_ResetPreflightFromDashboardReturnsNoContent(t *testing.T) {
+	req := httptest.NewRequest(http.MethodOptions, "/simulation/reset", nil)
+	req.Header.Set("Origin", dashboardOrigin)
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	rec := httptest.NewRecorder()
+	offlineRouter().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, quero 204", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != dashboardOrigin {
+		t.Errorf("Access-Control-Allow-Origin = %q, quero %q", got, dashboardOrigin)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, OPTIONS" {
+		t.Errorf("Access-Control-Allow-Methods = %q, quero GET, POST, OPTIONS", got)
+	}
+}

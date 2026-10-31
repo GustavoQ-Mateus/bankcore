@@ -33,6 +33,7 @@ func TestRouter_SimulationDisabledReturnsNotFound(t *testing.T) {
 	for _, route := range []struct{ method, path string }{
 		{http.MethodPost, "/simulation/start"},
 		{http.MethodPost, "/simulation/stop"},
+		{http.MethodPost, "/simulation/reset"},
 		{http.MethodGet, "/simulation/status"},
 		{http.MethodGet, "/simulation/stats"},
 	} {

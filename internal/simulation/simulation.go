@@ -32,6 +32,7 @@ const (
 	maxConflictAttempts   = 5
 	conflictBackoffBase   = 10 * time.Millisecond
 	conflictBackoffJitter = 20 * time.Millisecond
+	resetLockTimeout      = 5 * time.Second
 )
 
 type Phase string
@@ -152,6 +153,28 @@ func (r *Runner) Stop() Status {
 	return r.Status()
 }
 
+func (r *Runner) Reset(ctx context.Context) (Status, error) {
+	r.mu.Lock()
+	if r.active() {
+		r.mu.Unlock()
+		return Status{}, httpx.ErrSimulationRunning
+	}
+	if err := r.truncate(ctx); err != nil {
+		r.mu.Unlock()
+		return Status{}, httpx.ErrInternal
+	}
+	r.phase = PhaseIdle
+	r.runID = uuid.Nil
+	r.startedAt = time.Time{}
+	r.finishedAt = time.Time{}
+	r.config = DefaultConfig()
+	r.counters = &counters{}
+	r.transfers.ResetVersionConflicts()
+	r.mu.Unlock()
+
+	return r.Status(), nil
+}
+
 func (r *Runner) Status() Status {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -173,6 +196,22 @@ func (r *Runner) Status() Status {
 
 func (r *Runner) active() bool {
 	return r.phase == PhaseSeeding || r.phase == PhaseRunning
+}
+
+func (r *Runner) truncate(ctx context.Context) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, fmt.Sprintf("SET LOCAL lock_timeout = '%dms'", resetLockTimeout.Milliseconds())); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `TRUNCATE entries, transfers, accounts`); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Runner) setPhase(phase Phase) {
