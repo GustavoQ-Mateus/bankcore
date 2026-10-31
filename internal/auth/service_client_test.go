@@ -48,7 +48,7 @@ func setupAuthWithGate(t *testing.T, allowPublicAdminRegister bool) (*auth.Servi
 	}
 	t.Cleanup(pool.Close)
 
-	for _, m := range []string{"0001_init.up.sql", "0002_settlement.up.sql"} {
+	for _, m := range []string{"0001_init.up.sql", "0002_settlement.up.sql", "0003_entries_transfer_index.up.sql"} {
 		schema, err := os.ReadFile("../../migrations/" + m)
 		if err != nil {
 			t.Fatalf("ler migration %s: %v", m, err)
