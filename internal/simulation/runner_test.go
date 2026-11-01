@@ -11,9 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/GustavoQ-Mateus/bankcore/internal/account"
 	"github.com/GustavoQ-Mateus/bankcore/internal/auth"
@@ -39,9 +37,7 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 		tcpostgres.WithDatabase("bankcore"),
 		tcpostgres.WithUsername("bankcore"),
 		tcpostgres.WithPassword("bankcore"),
-		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
-		),
+		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
 		t.Fatalf("iniciar postgres: %v", err)
