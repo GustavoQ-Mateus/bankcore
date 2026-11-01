@@ -1,6 +1,6 @@
 # ADR 0005, Simulador com rotas de demonstração sem autenticação
 
-- **Status:** Aceita
+- **Status:** Aceita; trava 3 ("superfície limitada") revista pela [ADR 0006](0006-reset-ambiente-simulacao.md)
 - **Data:** 2026-10-31
 - **Contexto:** A única interface do produto é o dashboard de tempo real (Angular, repo Liquida, `http://localhost:4200`). O botão "Iniciar simulação" precisa chamar o BankCore direto do navegador para gerar carga, e o dashboard precisa ler estatísticas agregadas com poll frequente. Todo o resto da API do BankCore exige Bearer JWT (`CUSTOMER`, `ADMIN` ou `SETTLEMENT`).
 

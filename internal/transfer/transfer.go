@@ -62,6 +62,10 @@ func (s *Service) VersionConflicts() int64 {
 	return s.versionConflicts.Load()
 }
 
+func (s *Service) ResetVersionConflicts() {
+	s.versionConflicts.Store(0)
+}
+
 func (s *Service) Transfer(ctx context.Context, from, to uuid.UUID, amount int64, key string) (Transfer, error) {
 	if key == "" {
 		return Transfer{}, httpx.ErrValidation("header Idempotency-Key é obrigatório")

@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/GustavoQ-Mateus/bankcore/internal/account"
+	"github.com/GustavoQ-Mateus/bankcore/internal/platform/database"
 	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
 )
@@ -32,6 +33,9 @@ const (
 	maxConflictAttempts   = 5
 	conflictBackoffBase   = 10 * time.Millisecond
 	conflictBackoffJitter = 20 * time.Millisecond
+	resetLockTimeout      = 5 * time.Second
+	maxResetAttempts      = 3
+	resetRetryBackoff     = 100 * time.Millisecond
 )
 
 type Phase string
@@ -152,6 +156,28 @@ func (r *Runner) Stop() Status {
 	return r.Status()
 }
 
+func (r *Runner) Reset(ctx context.Context) (Status, error) {
+	r.mu.Lock()
+	if r.active() {
+		r.mu.Unlock()
+		return Status{}, httpx.ErrSimulationRunning
+	}
+	if err := r.truncateWithRetry(ctx); err != nil {
+		r.mu.Unlock()
+		return Status{}, httpx.ErrInternal
+	}
+	r.phase = PhaseIdle
+	r.runID = uuid.Nil
+	r.startedAt = time.Time{}
+	r.finishedAt = time.Time{}
+	r.config = DefaultConfig()
+	r.counters = &counters{}
+	r.transfers.ResetVersionConflicts()
+	r.mu.Unlock()
+
+	return r.Status(), nil
+}
+
 func (r *Runner) Status() Status {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -173,6 +199,39 @@ func (r *Runner) Status() Status {
 
 func (r *Runner) active() bool {
 	return r.phase == PhaseSeeding || r.phase == PhaseRunning
+}
+
+func (r *Runner) truncateWithRetry(ctx context.Context) error {
+	for attempt := 1; ; attempt++ {
+		err := r.truncate(ctx)
+		if err == nil || !database.IsLockFailure(err) || attempt == maxResetAttempts {
+			return err
+		}
+		select {
+		case <-time.After(resetRetryBackoff * time.Duration(attempt)):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (r *Runner) truncate(ctx context.Context) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, fmt.Sprintf("SET LOCAL lock_timeout = '%dms'", resetLockTimeout.Milliseconds())); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `LOCK TABLE transfers, entries, accounts IN ACCESS EXCLUSIVE MODE`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `TRUNCATE transfers, entries, accounts`); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Runner) setPhase(phase Phase) {

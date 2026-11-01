@@ -26,8 +26,8 @@ import (
 )
 
 // @title           BankCore API
-// @version         1.3.0
-// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004); v1.2.0 fecha o cadastro público de administrador (gate ALLOW_PUBLIC_ADMIN_REGISTER + seed do 1º admin); v1.3.0 adiciona o simulador de carga e as estatísticas do dashboard (SIMULATION_ENABLED, ADR 0005).
+// @version         1.4.0
+// @description     Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004); v1.2.0 fecha o cadastro público de administrador (gate ALLOW_PUBLIC_ADMIN_REGISTER + seed do 1º admin); v1.3.0 adiciona o simulador de carga e as estatísticas do dashboard (SIMULATION_ENABLED, ADR 0005); v1.4.0 adiciona a limpeza do ambiente de simulação (ADR 0006).
 // @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey  BearerAuth

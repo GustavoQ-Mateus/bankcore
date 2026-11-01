@@ -52,9 +52,9 @@ sequenceDiagram
 Go 1.22+ · chi · pgx + PostgreSQL · golang-migrate · JWT · testcontainers-go · Docker · Makefile · GitHub Actions · Swagger (swaggo).
 
 ## Documentação (spec-driven)
-- **Spec (versionada):** [`v1.0.0`](docs/specs/spec-v1.0.0.md) · [`v1.1.0`](docs/specs/spec-v1.1.0.md) · [`v1.2.0`](docs/specs/spec-v1.2.0.md) · [`v1.3.0`](docs/specs/spec-v1.3.0.md)
+- **Spec (versionada):** [`v1.0.0`](docs/specs/spec-v1.0.0.md) · [`v1.1.0`](docs/specs/spec-v1.1.0.md) · [`v1.2.0`](docs/specs/spec-v1.2.0.md) · [`v1.3.0`](docs/specs/spec-v1.3.0.md) · [`v1.4.0`](docs/specs/spec-v1.4.0.md)
 - **PRD:** [`docs/PRD_BankCore_Go.md`](docs/PRD_BankCore_Go.md)
-- **ADRs:** [0001 optimistic locking](docs/adr/0001-optimistic-locking.md) · [0002 dinheiro int64](docs/adr/0002-dinheiro-int64-centavos.md) · [0003 idempotência](docs/adr/0003-idempotencia-transferencias.md) · [0004 fronteira de liquidação](docs/adr/0004-fronteira-liquidacao-liquida.md) · [0005 simulador sem auth](docs/adr/0005-simulador-rotas-demo-sem-auth.md)
+- **ADRs:** [0001 optimistic locking](docs/adr/0001-optimistic-locking.md) · [0002 dinheiro int64](docs/adr/0002-dinheiro-int64-centavos.md) · [0003 idempotência](docs/adr/0003-idempotencia-transferencias.md) · [0004 fronteira de liquidação](docs/adr/0004-fronteira-liquidacao-liquida.md) · [0005 simulador sem auth](docs/adr/0005-simulador-rotas-demo-sem-auth.md) · [0006 reset da simulação](docs/adr/0006-reset-ambiente-simulacao.md)
 
 ## Como rodar
 ```bash
@@ -88,6 +88,7 @@ Health check: `curl localhost:8080/health`.
 | POST | `/admin/service-clients` | admin |
 | POST | `/simulation/start` | pública, só com `SIMULATION_ENABLED=true` |
 | POST | `/simulation/stop` | pública, só com `SIMULATION_ENABLED=true` |
+| POST | `/simulation/reset` | pública, só com `SIMULATION_ENABLED=true` |
 | GET | `/simulation/status` | pública, só com `SIMULATION_ENABLED=true` |
 | GET | `/simulation/stats` | pública, só com `SIMULATION_ENABLED=true` |
 | GET | `/health` | pública |
@@ -128,8 +129,11 @@ curl -X POST localhost:8081/simulation/start -H 'Content-Type: application/json'
 curl localhost:8081/simulation/status
 curl localhost:8081/simulation/stats
 curl -X POST localhost:8081/simulation/stop
+curl -X POST localhost:8081/simulation/reset
 ```
 O body do `start` é opcional (os valores acima são os defaults). Limites: `accounts` 2..500, `transfers` 1..100000, `rate` 1..500, `workers` 1..64. Uma execução por vez (`409 SIMULATION_RUNNING`).
+
+`POST /simulation/reset` (v1.4.0) devolve o ambiente ao zero para a próxima demonstração: apaga **todas** as contas, transferências e lançamentos do banco numa transação e zera o contador de colisões e o estado do simulador. Mantém `customers` (admin e customer técnico) e `service_clients` (a credencial do Liquida continua valendo). Com execução ativa responde `409 SIMULATION_RUNNING`; pare antes com `/simulation/stop`. É uma exceção de demonstração ao ledger append-only (ADR 0006): com `SIMULATION_ENABLED=true` o banco é tratado como descartável, por isso a flag nunca deve ser ligada em ambiente exposto ou com dados que importem.
 
 Desde a 1.3.0, toda transferência `PENDING` exposta ao Liquida tem dinheiro movido: `GET /settlement/transfers?status=PENDING` só lista pendentes com lançamentos, e `settle` sobre uma pendente ainda sem lançamentos responde `409 TRANSFER_NOT_BOOKED`. Ver `docs/specs/spec-v1.3.0.md`.
 
@@ -155,4 +159,4 @@ go test ./...            # sobe PostgreSQL real via testcontainers-go
 Cobrem atomicidade (CA1), concorrência com optimistic lock (CA2), idempotência (CA3) e a fronteira de liquidação: POST external deixa PENDING (CA6), settle idempotente (CA7), fail com estorno append-only (CA8) e RBAC da role SETTLEMENT (CA9). Na 1.3.0, também o simulador (fases, contadores, retry em conflito, cancelamento), as estatísticas, o CORS, o seed da credencial do Liquida e a recusa de liquidação sem lançamentos.
 
 ## Status
-v1.0.0 completa. **v1.1.0 (fronteira de liquidação com o Liquida)** implementada: modo `standalone`/`external`, auth M2M via client-credentials (JWT `SETTLEMENT`, TTL curto), `PATCH /transfers/{id}/settle` e `/fail` com estorno append-only, `GET /transfers?status=PENDING`. Ver `docs/specs/spec-v1.1.0.md` e ADR 0004. **v1.2.0** fecha o cadastro público de admin. **v1.3.0** adiciona o simulador de carga e as estatísticas do dashboard.
+v1.0.0 completa. **v1.1.0 (fronteira de liquidação com o Liquida)** implementada: modo `standalone`/`external`, auth M2M via client-credentials (JWT `SETTLEMENT`, TTL curto), `PATCH /transfers/{id}/settle` e `/fail` com estorno append-only, `GET /transfers?status=PENDING`. Ver `docs/specs/spec-v1.1.0.md` e ADR 0004. **v1.2.0** fecha o cadastro público de admin. **v1.3.0** adiciona o simulador de carga e as estatísticas do dashboard. **v1.4.0** adiciona a limpeza do ambiente de simulação.

@@ -37,6 +37,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Use(h.cors)
 	r.Post("/start", h.start)
 	r.Post("/stop", h.stop)
+	r.Post("/reset", h.reset)
 	r.Get("/status", h.status)
 	r.Get("/stats", h.stats)
 }
@@ -87,6 +88,24 @@ func (h *Handler) start(w http.ResponseWriter, r *http.Request) {
 // @Router       /simulation/stop [post]
 func (h *Handler) stop(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, h.runner.Stop())
+}
+
+// reset godoc
+// @Summary      Limpar ambiente de simulação
+// @Description  Apaga todos os lançamentos, transferências e contas numa transação (exceção de demonstração ao ledger append-only, ADR 0006). Mantém customers e service_clients. Zera version_conflicts e o estado do simulador. Execução ativa retorna 409 com error.code=SIMULATION_RUNNING.
+// @Tags         simulation
+// @Produce      json
+// @Success      200  {object}  Status
+// @Failure      409  {object}  map[string]any  "error.code=SIMULATION_RUNNING"
+// @Failure      500  {object}  map[string]any
+// @Router       /simulation/reset [post]
+func (h *Handler) reset(w http.ResponseWriter, r *http.Request) {
+	status, err := h.runner.Reset(r.Context())
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, status)
 }
 
 // status godoc
