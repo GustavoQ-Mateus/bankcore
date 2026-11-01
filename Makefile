@@ -1,4 +1,4 @@
-DATABASE_URL ?= postgres://bankcore:bankcore@localhost:5432/bankcore?sslmode=disable
+DATABASE_URL ?= postgres://bankcore:bankcore@localhost:5433/bankcore?sslmode=disable
 
 .PHONY: run build test tidy compose-up compose-down migrate-up migrate-down
 
