@@ -6,13 +6,10 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
@@ -26,9 +23,7 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 		tcpostgres.WithDatabase("bankcore"),
 		tcpostgres.WithUsername("bankcore"),
 		tcpostgres.WithPassword("bankcore"),
-		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
-		),
+		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
 		t.Fatalf("iniciar postgres: %v", err)
@@ -46,7 +41,7 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 
-	for _, m := range []string{"0001_init.up.sql", "0002_settlement.up.sql"} {
+	for _, m := range []string{"0001_init.up.sql", "0002_settlement.up.sql", "0003_entries_transfer_index.up.sql"} {
 		schema, err := os.ReadFile("../../migrations/" + m)
 		if err != nil {
 			t.Fatalf("ler migration %s: %v", m, err)
@@ -233,4 +228,43 @@ func transferWithClientRetry(svc *transfer.Service, from, to uuid.UUID, amount i
 		return false
 	}
 	return false
+}
+
+func TestTransfer_ConcurrentCountsVersionConflicts(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool)
+	a, b := seedAccounts(t, pool, 1000000)
+
+	const n = 20
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			transferWithClientRetry(svc, a, b, 100, uuid.NewString())
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if got := svc.VersionConflicts(); got == 0 {
+		t.Error("version_conflicts = 0, quero > 0 com transferências concorrentes nas mesmas contas")
+	}
+}
+
+func TestTransfer_SequentialHasNoVersionConflicts(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool)
+	a, b := seedAccounts(t, pool, 10000)
+
+	for i := 0; i < 3; i++ {
+		if _, err := svc.Transfer(context.Background(), a, b, 100, uuid.NewString()); err != nil {
+			t.Fatalf("transfer: %v", err)
+		}
+	}
+	if got := svc.VersionConflicts(); got != 0 {
+		t.Errorf("version_conflicts = %d, quero 0 sem concorrência", got)
+	}
 }

@@ -10,9 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/GustavoQ-Mateus/bankcore/internal/auth"
 )
@@ -29,9 +27,7 @@ func setupAuthWithGate(t *testing.T, allowPublicAdminRegister bool) (*auth.Servi
 		tcpostgres.WithDatabase("bankcore"),
 		tcpostgres.WithUsername("bankcore"),
 		tcpostgres.WithPassword("bankcore"),
-		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
-		),
+		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
 		t.Fatalf("iniciar postgres: %v", err)
@@ -48,7 +44,7 @@ func setupAuthWithGate(t *testing.T, allowPublicAdminRegister bool) (*auth.Servi
 	}
 	t.Cleanup(pool.Close)
 
-	for _, m := range []string{"0001_init.up.sql", "0002_settlement.up.sql"} {
+	for _, m := range []string{"0001_init.up.sql", "0002_settlement.up.sql", "0003_entries_transfer_index.up.sql"} {
 		schema, err := os.ReadFile("../../migrations/" + m)
 		if err != nil {
 			t.Fatalf("ler migration %s: %v", m, err)
@@ -150,5 +146,70 @@ func TestSettlementRoute_RejectsCustomer(t *testing.T) {
 	}
 	if code := hit(t, srv.URL+"/protected", ""); code != http.StatusUnauthorized {
 		t.Errorf("sem token recebeu %d, quero 401", code)
+	}
+}
+
+func TestEnsureServiceClient_SeedsAndIssuesToken(t *testing.T) {
+	svc, _ := setupAuth(t)
+	ctx := context.Background()
+
+	created, err := svc.EnsureServiceClient(ctx, "svc_liquida_dev", "dev-liquida-secret")
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if !created {
+		t.Fatal("primeiro seed deveria criar a credencial")
+	}
+
+	token, _, err := svc.IssueServiceToken(ctx, "svc_liquida_dev", "dev-liquida-secret")
+	if err != nil {
+		t.Fatalf("emitir token com credencial semeada: %v", err)
+	}
+
+	srv := protectedServer(svc)
+	defer srv.Close()
+
+	if code := hit(t, srv.URL+"/protected", token); code != http.StatusOK {
+		t.Errorf("credencial semeada recebeu %d, quero 200", code)
+	}
+}
+
+func TestEnsureServiceClient_IdempotentKeepsHash(t *testing.T) {
+	svc, pool := setupAuth(t)
+	ctx := context.Background()
+
+	if _, err := svc.EnsureServiceClient(ctx, "svc_liquida_dev", "dev-liquida-secret"); err != nil {
+		t.Fatalf("primeiro seed: %v", err)
+	}
+	var hashBefore string
+	if err := pool.QueryRow(ctx,
+		`SELECT secret_hash FROM service_clients WHERE client_id = 'svc_liquida_dev'`,
+	).Scan(&hashBefore); err != nil {
+		t.Fatalf("ler hash: %v", err)
+	}
+
+	created, err := svc.EnsureServiceClient(ctx, "svc_liquida_dev", "outro-secret")
+	if err != nil {
+		t.Fatalf("segundo seed: %v", err)
+	}
+	if created {
+		t.Error("segundo seed não deveria criar")
+	}
+
+	var count int
+	var hashAfter string
+	if err := pool.QueryRow(ctx,
+		`SELECT count(*), max(secret_hash) FROM service_clients WHERE client_id = 'svc_liquida_dev'`,
+	).Scan(&count, &hashAfter); err != nil {
+		t.Fatalf("contar: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("linhas = %d, quero 1", count)
+	}
+	if hashAfter != hashBefore {
+		t.Error("hash alterado pelo segundo seed")
+	}
+	if _, _, err := svc.IssueServiceToken(ctx, "svc_liquida_dev", "dev-liquida-secret"); err != nil {
+		t.Errorf("secret original deveria continuar válido: %v", err)
 	}
 }

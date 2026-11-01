@@ -48,6 +48,10 @@ services:
       SERVICE_JWT_TTL: "15m"
       LIQUIDA_INTEGRATION: "external"
       BCRYPT_COST: "10"
+      SIMULATION_ENABLED: "true"
+      SIMULATION_CORS_ORIGIN: "http://localhost:4200"
+      SETTLEMENT_CLIENT_ID: "${SETTLEMENT_CLIENT_ID:-svc_liquida_dev}"
+      SETTLEMENT_CLIENT_SECRET: "${SETTLEMENT_CLIENT_SECRET:-dev-liquida-secret-change-me}"
     ports:
       - "8081:8080"
     networks:

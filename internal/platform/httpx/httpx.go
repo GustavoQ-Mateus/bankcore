@@ -27,10 +27,13 @@ var (
 	ErrConflict     = func(msg string) *APIError { return NewError(http.StatusConflict, "CONFLICT", msg) }
 	ErrInternal     = NewError(http.StatusInternalServerError, "INTERNAL", "erro interno")
 
-	ErrSettleOnFailed = NewError(http.StatusConflict, "SETTLE_ON_FAILED", "transferência falhou e não pode ser liquidada")
-	ErrFailOnSettled  = NewError(http.StatusConflict, "FAIL_ON_SETTLED", "transferência já liquidada e não pode falhar")
+	ErrSettleOnFailed    = NewError(http.StatusConflict, "SETTLE_ON_FAILED", "transferência falhou e não pode ser liquidada")
+	ErrFailOnSettled     = NewError(http.StatusConflict, "FAIL_ON_SETTLED", "transferência já liquidada e não pode falhar")
+	ErrTransferNotBooked = NewError(http.StatusConflict, "TRANSFER_NOT_BOOKED", "transferência ainda sem movimento e não pode ser liquidada")
 
 	ErrAdminRegisterDisabled = NewError(http.StatusForbidden, "ADMIN_REGISTER_DISABLED", "cadastro público com role privilegiada está desabilitado")
+
+	ErrSimulationRunning = NewError(http.StatusConflict, "SIMULATION_RUNNING", "já existe uma simulação em execução")
 )
 
 func Decode(r *http.Request, dst any) error {

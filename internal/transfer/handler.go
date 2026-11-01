@@ -155,6 +155,7 @@ func (h *Handler) adminList(w http.ResponseWriter, r *http.Request) {
 
 // settlementList godoc
 // @Summary  Listar transferências por status (SETTLEMENT)
+// @Description  Com status=PENDING lista só as transferências que já têm lançamentos (dinheiro movido).
 // @Tags     settlement
 // @Produce  json
 // @Security BearerAuth
@@ -170,7 +171,7 @@ func (h *Handler) settlementList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := pageParam(r)
-	transfers, hasNext, err := h.svc.ListByStatusPaged(r.Context(), status, pageSize, (page-1)*pageSize)
+	transfers, hasNext, err := h.svc.ListForSettlement(r.Context(), status, pageSize, (page-1)*pageSize)
 	if err != nil {
 		httpx.Error(w, err)
 		return
@@ -219,7 +220,7 @@ type settleRequest struct {
 
 // settle godoc
 // @Summary  Confirmar liquidação (SETTLEMENT)
-// @Description  PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED.
+// @Description  PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED. Sobre PENDING ainda sem lançamentos retorna 409 com error.code=TRANSFER_NOT_BOOKED.
 // @Tags     settlement
 // @Accept   json
 // @Produce  json
@@ -229,7 +230,7 @@ type settleRequest struct {
 // @Success  200   {object}  Transfer
 // @Failure  403   {object}  map[string]any
 // @Failure  404   {object}  map[string]any
-// @Failure  409   {object}  map[string]any  "error.code=SETTLE_ON_FAILED"
+// @Failure  409   {object}  map[string]any  "error.code=SETTLE_ON_FAILED ou TRANSFER_NOT_BOOKED"
 // @Router   /transfers/{id}/settle [patch]
 func (h *Handler) settle(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))

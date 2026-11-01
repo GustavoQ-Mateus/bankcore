@@ -54,6 +54,33 @@ func (s *Service) CreateServiceClient(ctx context.Context) (ServiceClient, strin
 	return sc, secret, nil
 }
 
+func (s *Service) EnsureServiceClient(ctx context.Context, clientID, clientSecret string) (bool, error) {
+	var exists bool
+	if err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM service_clients WHERE client_id = $1)`, clientID,
+	).Scan(&exists); err != nil {
+		return false, err
+	}
+	if exists {
+		return false, nil
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(clientSecret), s.bcryptCost)
+	if err != nil {
+		return false, err
+	}
+
+	tag, err := s.pool.Exec(ctx,
+		`INSERT INTO service_clients (client_id, secret_hash, role) VALUES ($1, $2, $3)
+		 ON CONFLICT (client_id) DO NOTHING`,
+		clientID, string(hash), RoleSettlement,
+	)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 func (s *Service) IssueServiceToken(ctx context.Context, clientID, clientSecret string) (string, int, error) {
 	var (
 		id         uuid.UUID

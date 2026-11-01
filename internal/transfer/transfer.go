@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,8 +37,9 @@ type Transfer struct {
 }
 
 type Service struct {
-	pool     *pgxpool.Pool
-	external bool
+	pool             *pgxpool.Pool
+	external         bool
+	versionConflicts atomic.Int64
 }
 
 type Option func(*Service)
@@ -55,6 +57,10 @@ func NewService(pool *pgxpool.Pool, opts ...Option) *Service {
 }
 
 var errVersionConflict = errors.New("version conflict")
+
+func (s *Service) VersionConflicts() int64 {
+	return s.versionConflicts.Load()
+}
 
 func (s *Service) Transfer(ctx context.Context, from, to uuid.UUID, amount int64, key string) (Transfer, error) {
 	if key == "" {
@@ -121,6 +127,7 @@ func (s *Service) process(ctx context.Context, t Transfer) (Transfer, error) {
 			return t, nil
 		}
 		if errors.Is(err, errVersionConflict) {
+			s.versionConflicts.Add(1)
 			continue
 		}
 		var apiErr *httpx.APIError
@@ -296,9 +303,15 @@ func (s *Service) ListByStatus(ctx context.Context, status Status, limit, offset
 	return transfers, nil
 }
 
-func (s *Service) ListByStatusPaged(ctx context.Context, status Status, limit, offset int) ([]Transfer, bool, error) {
+const bookedFilter = ` AND EXISTS (SELECT 1 FROM entries e WHERE e.transfer_id = transfers.id)`
+
+func (s *Service) ListForSettlement(ctx context.Context, status Status, limit, offset int) ([]Transfer, bool, error) {
+	where := `status = $1`
+	if status == StatusPending {
+		where += bookedFilter
+	}
 	rows, err := s.pool.Query(ctx,
-		`SELECT `+transferCols+` FROM transfers WHERE status = $1 ORDER BY created_at ASC, id ASC LIMIT $2 OFFSET $3`,
+		`SELECT `+transferCols+` FROM transfers WHERE `+where+` ORDER BY created_at ASC, id ASC LIMIT $2 OFFSET $3`,
 		status, limit+1, offset,
 	)
 	if err != nil {
@@ -371,6 +384,13 @@ func (s *Service) Settle(ctx context.Context, id uuid.UUID, ref string) (Transfe
 	case StatusFailed:
 		return Transfer{}, httpx.ErrSettleOnFailed
 	case StatusPending:
+		booked, err := isBooked(ctx, tx, id)
+		if err != nil {
+			return Transfer{}, err
+		}
+		if !booked {
+			return Transfer{}, httpx.ErrTransferNotBooked
+		}
 		var refArg any
 		if ref != "" {
 			refArg = ref
@@ -480,6 +500,16 @@ func (s *Service) findByKey(ctx context.Context, key string) (Transfer, error) {
 		return Transfer{}, httpx.ErrInternal
 	}
 	return t, nil
+}
+
+func isBooked(ctx context.Context, q database.Querier, id uuid.UUID) (bool, error) {
+	var booked bool
+	if err := q.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM entries WHERE transfer_id = $1)`, id,
+	).Scan(&booked); err != nil {
+		return false, httpx.ErrInternal
+	}
+	return booked, nil
 }
 
 func order(a, b uuid.UUID) (uuid.UUID, uuid.UUID) {

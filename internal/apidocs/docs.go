@@ -33,7 +33,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/account.Account"
+                            "$ref": "#/definitions/internal_account.Account"
                         }
                     },
                     "401": {
@@ -73,7 +73,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/account.Account"
+                            "$ref": "#/definitions/internal_account.Account"
                         }
                     },
                     "403": {
@@ -124,7 +124,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/account.amountRequest"
+                            "$ref": "#/definitions/internal_account.amountRequest"
                         }
                     }
                 ],
@@ -132,7 +132,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/account.Account"
+                            "$ref": "#/definitions/internal_account.Account"
                         }
                     },
                     "400": {
@@ -223,7 +223,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/account.amountRequest"
+                            "$ref": "#/definitions/internal_account.amountRequest"
                         }
                     }
                 ],
@@ -231,7 +231,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/account.Account"
+                            "$ref": "#/definitions/internal_account.Account"
                         }
                     },
                     "400": {
@@ -271,7 +271,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/account.Account"
+                                "$ref": "#/definitions/internal_account.Account"
                             }
                         }
                     },
@@ -316,7 +316,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/account.statusRequest"
+                            "$ref": "#/definitions/internal_account.statusRequest"
                         }
                     }
                 ],
@@ -324,7 +324,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/account.Account"
+                            "$ref": "#/definitions/internal_account.Account"
                         }
                     },
                     "403": {
@@ -443,7 +443,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.loginRequest"
+                            "$ref": "#/definitions/internal_auth.loginRequest"
                         }
                     }
                 ],
@@ -484,7 +484,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.registerRequest"
+                            "$ref": "#/definitions/internal_auth.registerRequest"
                         }
                     }
                 ],
@@ -492,7 +492,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/auth.Customer"
+                            "$ref": "#/definitions/internal_auth.Customer"
                         }
                     },
                     "400": {
@@ -539,7 +539,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.tokenRequest"
+                            "$ref": "#/definitions/internal_auth.tokenRequest"
                         }
                     }
                 ],
@@ -568,6 +568,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Com status=PENDING lista só as transferências que já têm lançamentos (dinheiro movido).",
                 "produces": [
                     "application/json"
                 ],
@@ -603,6 +604,119 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/simulation/start": {
+            "post": {
+                "description": "Recurso de demonstração (SIMULATION_ENABLED=true), sem autenticação (ADR 0005). Campos omitidos usam o default. Limites: accounts 2..500, transfers 1..100000, rate 1..500, workers 1..64. Execução ativa retorna 409 com error.code=SIMULATION_RUNNING.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "simulation"
+                ],
+                "summary": "Iniciar simulação de carga",
+                "parameters": [
+                    {
+                        "description": "configuração da execução",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_simulation.startRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_simulation.Status"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "error.code=SIMULATION_RUNNING",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/simulation/stats": {
+            "get": {
+                "description": "Agregados do banco num snapshot coerente. transfers.pending e volume_cents.pending contam só PENDING com lançamentos. Valores monetários em centavos.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "simulation"
+                ],
+                "summary": "Estatísticas para o dashboard",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_simulation.Stats"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/simulation/status": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "simulation"
+                ],
+                "summary": "Estado da simulação",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_simulation.Status"
+                        }
+                    }
+                }
+            }
+        },
+        "/simulation/stop": {
+            "post": {
+                "description": "Cancela a execução ativa sem interromper transferências em andamento e responde já em stopped. Sem execução ativa é no-op.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "simulation"
+                ],
+                "summary": "Parar simulação",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_simulation.Status"
                         }
                     }
                 }
@@ -677,7 +791,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/transfer.transferRequest"
+                            "$ref": "#/definitions/internal_transfer.transferRequest"
                         }
                     }
                 ],
@@ -685,7 +799,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/transfer.Transfer"
+                            "$ref": "#/definitions/internal_transfer.Transfer"
                         }
                     },
                     "400": {
@@ -739,7 +853,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/transfer.Transfer"
+                            "$ref": "#/definitions/internal_transfer.Transfer"
                         }
                     },
                     "403": {
@@ -787,7 +901,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/transfer.Transfer"
+                            "$ref": "#/definitions/internal_transfer.Transfer"
                         }
                     },
                     "403": {
@@ -821,7 +935,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED.",
+                "description": "PENDING→SETTLED. Repetir sobre SETTLED é no-op idempotente (200). Sobre FAILED retorna 409 com error.code=SETTLE_ON_FAILED. Sobre PENDING ainda sem lançamentos retorna 409 com error.code=TRANSFER_NOT_BOOKED.",
                 "consumes": [
                     "application/json"
                 ],
@@ -845,7 +959,7 @@ const docTemplate = `{
                         "name": "body",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/transfer.settleRequest"
+                            "$ref": "#/definitions/internal_transfer.settleRequest"
                         }
                     }
                 ],
@@ -853,7 +967,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/transfer.Transfer"
+                            "$ref": "#/definitions/internal_transfer.Transfer"
                         }
                     },
                     "403": {
@@ -871,7 +985,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "error.code=SETTLE_ON_FAILED",
+                        "description": "error.code=SETTLE_ON_FAILED ou TRANSFER_NOT_BOOKED",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -882,7 +996,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "account.Account": {
+        "internal_account.Account": {
             "type": "object",
             "properties": {
                 "balance_cents": {
@@ -901,14 +1015,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/account.Status"
+                    "$ref": "#/definitions/internal_account.Status"
                 },
                 "version": {
                     "type": "integer"
                 }
             }
         },
-        "account.Status": {
+        "internal_account.Status": {
             "type": "string",
             "enum": [
                 "ACTIVE",
@@ -919,7 +1033,7 @@ const docTemplate = `{
                 "StatusBlocked"
             ]
         },
-        "account.amountRequest": {
+        "internal_account.amountRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -927,15 +1041,15 @@ const docTemplate = `{
                 }
             }
         },
-        "account.statusRequest": {
+        "internal_account.statusRequest": {
             "type": "object",
             "properties": {
                 "status": {
-                    "$ref": "#/definitions/account.Status"
+                    "$ref": "#/definitions/internal_account.Status"
                 }
             }
         },
-        "auth.Customer": {
+        "internal_auth.Customer": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -951,11 +1065,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/auth.Role"
+                    "$ref": "#/definitions/internal_auth.Role"
                 }
             }
         },
-        "auth.Role": {
+        "internal_auth.Role": {
             "type": "string",
             "enum": [
                 "CUSTOMER",
@@ -968,7 +1082,7 @@ const docTemplate = `{
                 "RoleSettlement"
             ]
         },
-        "auth.loginRequest": {
+        "internal_auth.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -979,7 +1093,7 @@ const docTemplate = `{
                 }
             }
         },
-        "auth.registerRequest": {
+        "internal_auth.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -992,11 +1106,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/auth.Role"
+                    "$ref": "#/definitions/internal_auth.Role"
                 }
             }
         },
-        "auth.tokenRequest": {
+        "internal_auth.tokenRequest": {
             "type": "object",
             "properties": {
                 "client_id": {
@@ -1007,7 +1121,188 @@ const docTemplate = `{
                 }
             }
         },
-        "transfer.Status": {
+        "internal_simulation.Config": {
+            "type": "object",
+            "properties": {
+                "accounts": {
+                    "type": "integer"
+                },
+                "rate": {
+                    "type": "integer"
+                },
+                "transfers": {
+                    "type": "integer"
+                },
+                "workers": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_simulation.Counters": {
+            "type": "object",
+            "properties": {
+                "accepted": {
+                    "type": "integer"
+                },
+                "conflict_exhausted": {
+                    "type": "integer"
+                },
+                "dispatched": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "integer"
+                },
+                "rejected_insufficient": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_simulation.Latency": {
+            "type": "object",
+            "properties": {
+                "p50": {
+                    "type": "number"
+                },
+                "p95": {
+                    "type": "number"
+                }
+            }
+        },
+        "internal_simulation.Ledger": {
+            "type": "object",
+            "properties": {
+                "accounts": {
+                    "type": "integer"
+                },
+                "divergent_accounts": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_simulation.Phase": {
+            "type": "string",
+            "enum": [
+                "idle",
+                "seeding",
+                "running",
+                "finished",
+                "stopped"
+            ],
+            "x-enum-varnames": [
+                "PhaseIdle",
+                "PhaseSeeding",
+                "PhaseRunning",
+                "PhaseFinished",
+                "PhaseStopped"
+            ]
+        },
+        "internal_simulation.Stats": {
+            "type": "object",
+            "properties": {
+                "captured_at": {
+                    "type": "string"
+                },
+                "ledger": {
+                    "$ref": "#/definitions/internal_simulation.Ledger"
+                },
+                "settlement_latency_ms": {
+                    "$ref": "#/definitions/internal_simulation.Latency"
+                },
+                "simulation": {
+                    "$ref": "#/definitions/internal_simulation.Status"
+                },
+                "throughput": {
+                    "$ref": "#/definitions/internal_simulation.Throughput"
+                },
+                "transfers": {
+                    "$ref": "#/definitions/internal_simulation.TransferCounts"
+                },
+                "version_conflicts": {
+                    "type": "integer"
+                },
+                "volume_cents": {
+                    "$ref": "#/definitions/internal_simulation.Volume"
+                }
+            }
+        },
+        "internal_simulation.Status": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/internal_simulation.Config"
+                },
+                "counters": {
+                    "$ref": "#/definitions/internal_simulation.Counters"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "phase": {
+                    "$ref": "#/definitions/internal_simulation.Phase"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_simulation.Throughput": {
+            "type": "object",
+            "properties": {
+                "created_per_sec": {
+                    "type": "integer"
+                },
+                "settled_per_sec": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_simulation.TransferCounts": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer"
+                },
+                "pending": {
+                    "type": "integer"
+                },
+                "settled": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_simulation.Volume": {
+            "type": "object",
+            "properties": {
+                "pending": {
+                    "type": "integer"
+                },
+                "settled": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_simulation.startRequest": {
+            "type": "object",
+            "properties": {
+                "accounts": {
+                    "type": "integer"
+                },
+                "rate": {
+                    "type": "integer"
+                },
+                "transfers": {
+                    "type": "integer"
+                },
+                "workers": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_transfer.Status": {
             "type": "string",
             "enum": [
                 "PENDING",
@@ -1020,7 +1315,7 @@ const docTemplate = `{
                 "StatusFailed"
             ]
         },
-        "transfer.Transfer": {
+        "internal_transfer.Transfer": {
             "type": "object",
             "properties": {
                 "amount_cents": {
@@ -1042,14 +1337,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/transfer.Status"
+                    "$ref": "#/definitions/internal_transfer.Status"
                 },
                 "to_account_id": {
                     "type": "string"
                 }
             }
         },
-        "transfer.settleRequest": {
+        "internal_transfer.settleRequest": {
             "type": "object",
             "properties": {
                 "settlement_ref": {
@@ -1057,7 +1352,7 @@ const docTemplate = `{
                 }
             }
         },
-        "transfer.transferRequest": {
+        "internal_transfer.transferRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -1084,12 +1379,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.2.0",
+	Version:          "1.3.0",
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "BankCore API",
-	Description:      "Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004); v1.2.0 fecha o cadastro público de administrador (gate ALLOW_PUBLIC_ADMIN_REGISTER + seed do 1º admin).",
+	Description:      "Núcleo bancário em Go: contas, depósitos, saques e transferências atômicas com ledger append-only. Valores entram/saem em decimal e são operados em centavos int64. v1.1.0 adiciona a fronteira de liquidação com o Liquida (ADR 0004); v1.2.0 fecha o cadastro público de administrador (gate ALLOW_PUBLIC_ADMIN_REGISTER + seed do 1º admin); v1.3.0 adiciona o simulador de carga e as estatísticas do dashboard (SIMULATION_ENABLED, ADR 0005).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

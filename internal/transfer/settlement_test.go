@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 	"github.com/GustavoQ-Mateus/bankcore/internal/transfer"
@@ -154,7 +155,7 @@ func TestExternal_FailReverses(t *testing.T) {
 	}
 }
 
-func TestListByStatusPaged_HasNext(t *testing.T) {
+func TestListForSettlement_HasNext(t *testing.T) {
 	pool := setupPool(t)
 	svc := transfer.NewService(pool, transfer.WithExternalSettlement())
 	a, b := seedAccounts(t, pool, 1000000)
@@ -166,7 +167,7 @@ func TestListByStatusPaged_HasNext(t *testing.T) {
 		}
 	}
 
-	first, hasNext, err := svc.ListByStatusPaged(ctx, transfer.StatusPending, 2, 0)
+	first, hasNext, err := svc.ListForSettlement(ctx, transfer.StatusPending, 2, 0)
 	if err != nil {
 		t.Fatalf("page1: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestListByStatusPaged_HasNext(t *testing.T) {
 		t.Fatalf("page1 len=%d has_next=%v, quero 2/true", len(first), hasNext)
 	}
 
-	second, hasNext, err := svc.ListByStatusPaged(ctx, transfer.StatusPending, 2, 2)
+	second, hasNext, err := svc.ListForSettlement(ctx, transfer.StatusPending, 2, 2)
 	if err != nil {
 		t.Fatalf("page2: %v", err)
 	}
@@ -236,4 +237,107 @@ func conflictCode(t *testing.T, err error) string {
 		t.Fatalf("status = %d, quero 409", apiErr.Status)
 	}
 	return apiErr.Code
+}
+
+func insertOrphanPending(t *testing.T, pool *pgxpool.Pool, from, to uuid.UUID, amount int64, key string) uuid.UUID {
+	t.Helper()
+	var id uuid.UUID
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO transfers (from_account_id, to_account_id, amount_cents, idempotency_key, status)
+		 VALUES ($1, $2, $3, $4, 'PENDING') RETURNING id`,
+		from, to, amount, key,
+	).Scan(&id); err != nil {
+		t.Fatalf("inserir pendente órfã: %v", err)
+	}
+	return id
+}
+
+func backlogIDs(t *testing.T, svc *transfer.Service) map[uuid.UUID]bool {
+	t.Helper()
+	transfers, _, err := svc.ListForSettlement(context.Background(), transfer.StatusPending, 50, 0)
+	if err != nil {
+		t.Fatalf("listar backlog: %v", err)
+	}
+	ids := map[uuid.UUID]bool{}
+	for _, tr := range transfers {
+		ids[tr.ID] = true
+	}
+	return ids
+}
+
+func TestExternal_SettleUnbookedPendingReturnsNotBooked(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool, transfer.WithExternalSettlement())
+	a, b := seedAccounts(t, pool, 10000)
+	ctx := context.Background()
+
+	orphan := insertOrphanPending(t, pool, a, b, 3000, "orphan-settle")
+
+	_, err := svc.Settle(ctx, orphan, "liq-ref")
+	if code := conflictCode(t, err); code != "TRANSFER_NOT_BOOKED" {
+		t.Fatalf("code = %s, quero TRANSFER_NOT_BOOKED", code)
+	}
+
+	got, err := svc.Get(ctx, orphan)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Status != transfer.StatusPending || got.SettledAt != nil || got.SettlementRef != nil {
+		t.Errorf("transferência alterada: status=%s settled_at=%v ref=%v", got.Status, got.SettledAt, got.SettlementRef)
+	}
+}
+
+func TestListForSettlement_PendingExcludesUnbooked(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool, transfer.WithExternalSettlement())
+	a, b := seedAccounts(t, pool, 10000)
+	ctx := context.Background()
+
+	booked, err := svc.Transfer(ctx, a, b, 1000, "booked-1")
+	if err != nil {
+		t.Fatalf("transfer: %v", err)
+	}
+	orphan := insertOrphanPending(t, pool, a, b, 2000, "orphan-list")
+
+	ids := backlogIDs(t, svc)
+	if !ids[booked.ID] {
+		t.Error("pendente com lançamentos ausente do backlog")
+	}
+	if ids[orphan] {
+		t.Error("pendente sem lançamentos apareceu no backlog")
+	}
+}
+
+func TestExternal_ExhaustedConflictRetriedWithSameKeyEntersBacklog(t *testing.T) {
+	pool := setupPool(t)
+	svc := transfer.NewService(pool, transfer.WithExternalSettlement())
+	a, b := seedAccounts(t, pool, 10000)
+	ctx := context.Background()
+
+	orphan := insertOrphanPending(t, pool, a, b, 3000, "orphan-retry")
+
+	if backlogIDs(t, svc)[orphan] {
+		t.Fatal("órfã no backlog antes do retry")
+	}
+	_, err := svc.Settle(ctx, orphan, "")
+	if code := conflictCode(t, err); code != "TRANSFER_NOT_BOOKED" {
+		t.Fatalf("code = %s, quero TRANSFER_NOT_BOOKED", code)
+	}
+
+	retried, err := svc.Transfer(ctx, a, b, 3000, "orphan-retry")
+	if err != nil {
+		t.Fatalf("retry com a mesma chave: %v", err)
+	}
+	if retried.ID != orphan || retried.Status != transfer.StatusPending {
+		t.Fatalf("retry devolveu id=%s status=%s, quero %s PENDING", retried.ID, retried.Status, orphan)
+	}
+	if got := balanceOf(t, pool, a); got != 7000 {
+		t.Errorf("saldo A = %d, quero 7000", got)
+	}
+	if !backlogIDs(t, svc)[orphan] {
+		t.Fatal("transferência concluída ausente do backlog")
+	}
+	if _, err := svc.Settle(ctx, orphan, ""); err != nil {
+		t.Fatalf("settle após retry: %v", err)
+	}
 }

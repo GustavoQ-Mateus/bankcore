@@ -18,6 +18,10 @@ type Config struct {
 	AllowPublicAdminRegister bool
 	AdminEmail               string
 	AdminPassword            string
+	SettlementClientID       string
+	SettlementClientSecret   string
+	SimulationEnabled        bool
+	SimulationCORSOrigin     string
 }
 
 func Load() (Config, error) {
@@ -63,6 +67,15 @@ func Load() (Config, error) {
 
 	cfg.AdminEmail = os.Getenv("ADMIN_EMAIL")
 	cfg.AdminPassword = os.Getenv("ADMIN_PASSWORD")
+	cfg.SettlementClientID = os.Getenv("SETTLEMENT_CLIENT_ID")
+	cfg.SettlementClientSecret = os.Getenv("SETTLEMENT_CLIENT_SECRET")
+
+	simulation, err := strconv.ParseBool(getenv("SIMULATION_ENABLED", "false"))
+	if err != nil {
+		return Config{}, fmt.Errorf("SIMULATION_ENABLED inválido: %w", err)
+	}
+	cfg.SimulationEnabled = simulation
+	cfg.SimulationCORSOrigin = getenv("SIMULATION_CORS_ORIGIN", "http://localhost:4200")
 
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = "dev-insecure-secret-change-me"
