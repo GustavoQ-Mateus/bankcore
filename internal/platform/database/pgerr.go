@@ -13,3 +13,11 @@ func IsUniqueViolation(err error) bool {
 	}
 	return false
 }
+
+func IsLockFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "40P01" || pgErr.Code == "55P03"
+	}
+	return false
+}

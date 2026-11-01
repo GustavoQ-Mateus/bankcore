@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/GustavoQ-Mateus/bankcore/internal/auth"
 	"github.com/GustavoQ-Mateus/bankcore/internal/platform/httpx"
 	"github.com/GustavoQ-Mateus/bankcore/internal/simulation"
@@ -222,5 +224,101 @@ func TestResetHandler_ReturnsIdleStatusBody(t *testing.T) {
 		`"counters":{"dispatched":0,"accepted":0,"rejected_insufficient":0,"conflict_exhausted":0,"errors":0}}` + "\n"
 	if rec.Body.String() != want {
 		t.Errorf("corpo = %s, quero %s", rec.Body.String(), want)
+	}
+}
+
+func waitForBlockedLock(t *testing.T, f fixture) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		var waiting int
+		if err := f.pool.QueryRow(context.Background(), `SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&waiting); err != nil {
+			t.Fatalf("consultar pg_locks: %v", err)
+		}
+		if waiting > 0 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("o reset não chegou a esperar lock")
+}
+
+func TestReset_WaitsForSettleLockOrderWithoutDeadlock(t *testing.T) {
+	f := setupFixture(t)
+	ctx := context.Background()
+	runToFinished(t, f, smallConfig())
+	pending, _, err := f.transfers.ListForSettlement(ctx, transfer.StatusPending, 1, 0)
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("backlog: %d itens, erro %v", len(pending), err)
+	}
+
+	tx, err := f.pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT status FROM transfers WHERE id = $1 FOR UPDATE`, pending[0].ID); err != nil {
+		t.Fatalf("for update: %v", err)
+	}
+
+	resetErr := make(chan error, 1)
+	go func() {
+		_, err := f.runner.Reset(ctx)
+		resetErr <- err
+	}()
+	waitForBlockedLock(t, f)
+
+	var booked bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM entries WHERE transfer_id = $1)`, pending[0].ID).Scan(&booked); err != nil {
+		t.Fatalf("leitura de entries na transação do settle: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	if err := <-resetErr; err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if entries, transfers, accounts := tableCounts(t, f); entries != 0 || transfers != 0 || accounts != 0 {
+		t.Errorf("entries=%d transfers=%d accounts=%d, quero tudo vazio", entries, transfers, accounts)
+	}
+}
+
+func TestReset_ConcurrentSettlesEndSettledOrNotFound(t *testing.T) {
+	f := setupFixture(t)
+	ctx := context.Background()
+	runToFinished(t, f, simulation.Config{Accounts: 4, Transfers: 60, Rate: 500, Workers: 8})
+	pending, _, err := f.transfers.ListForSettlement(ctx, transfer.StatusPending, 50, 0)
+	if err != nil || len(pending) == 0 {
+		t.Fatalf("backlog: %d itens, erro %v", len(pending), err)
+	}
+
+	start := make(chan struct{})
+	settleErrs := make(chan error, len(pending))
+	for _, tr := range pending {
+		go func(id uuid.UUID) {
+			<-start
+			_, err := f.transfers.Settle(ctx, id, "ref")
+			settleErrs <- err
+		}(tr.ID)
+	}
+	resetErr := make(chan error, 1)
+	go func() {
+		<-start
+		_, err := f.runner.Reset(ctx)
+		resetErr <- err
+	}()
+	close(start)
+
+	if err := <-resetErr; err != nil {
+		t.Fatalf("reset com settles em voo: %v", err)
+	}
+	for range pending {
+		if err := <-settleErrs; err != nil && !errors.Is(err, httpx.ErrNotFound) {
+			t.Errorf("settle concorrente: erro = %v, quero 200 antes do reset ou 404 depois", err)
+		}
+	}
+	if entries, transfers, accounts := tableCounts(t, f); entries != 0 || transfers != 0 || accounts != 0 {
+		t.Errorf("entries=%d transfers=%d accounts=%d, quero tudo vazio", entries, transfers, accounts)
 	}
 }
